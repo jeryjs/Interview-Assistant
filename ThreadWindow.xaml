@@ -41,11 +41,17 @@
 
         <Grid Grid.Row="1">
             <Grid.RowDefinitions>
-                <RowDefinition Height="1.2*" />
-                <RowDefinition Height="1.8*" />
+                <RowDefinition x:Name="ReasoningRow" Height="0" />
+                <RowDefinition x:Name="AnswerRow" Height="*" />
             </Grid.RowDefinitions>
 
-            <Border Grid.Row="0" BorderBrush="#2A3A51" BorderThickness="0,0,0,1" Padding="8,6,8,4">
+            <Border x:Name="ReasoningSection"
+                    Grid.Row="0"
+                    Visibility="Collapsed"
+                    BorderBrush="#23354D"
+                    BorderThickness="0,0,0,1"
+                    Background="#180D1420"
+                    Padding="8,4,8,4">
                 <Grid>
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto" />
@@ -53,9 +59,9 @@
                     </Grid.RowDefinitions>
 
                     <TextBlock Text="Reasoning"
-                               Foreground="#BDD0EE"
+                               Foreground="#95AECE"
                                FontWeight="SemiBold"
-                               FontSize="12"
+                               FontSize="11"
                                Margin="2,0,0,6" />
 
                     <wpf:WebView2 x:Name="ReasoningView" Grid.Row="1" Margin="0" />

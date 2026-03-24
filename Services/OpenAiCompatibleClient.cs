@@ -68,7 +68,7 @@ public sealed class OpenAiCompatibleClient
         var payload = new Dictionary<string, object?>
         {
             ["model"] = string.IsNullOrWhiteSpace(modelId) ? loadout.ModelId : modelId,
-            ["stream"] = true,
+            ["stream"] = true, // Required for incremental SSE token rendering.
             ["messages"] = new object[]
             {
                 new

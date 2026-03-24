@@ -382,7 +382,7 @@ public partial class MainWindow : Window
         _state.Normalize();
         await AppStateStore.SaveAsync(_state);
         ApplyStateToUi();
-        SetStatus("Provider settings saved");
+        SetStatus("Settings saved");
     }
 
     private void OnContextWindowValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)

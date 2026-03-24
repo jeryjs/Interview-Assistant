@@ -1,13 +1,58 @@
 <Window x:Class="Naveen_Sir.LoadoutDialog"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="Provider Loadouts"
+    Title="Settings"
     Height="590"
     Width="1120"
         MinHeight="520"
         MinWidth="900"
         WindowStartupLocation="CenterOwner"
     Background="#111722">
+    <Window.Resources>
+        <SolidColorBrush x:Key="DialogSurfaceBrush" Color="#0B121B" />
+        <SolidColorBrush x:Key="DialogPanelBrush" Color="#111722" />
+        <SolidColorBrush x:Key="DialogBorderBrush" Color="#2A3850" />
+        <SolidColorBrush x:Key="DialogTextBrush" Color="#D7E2F7" />
+        <SolidColorBrush x:Key="DialogMutedBrush" Color="#B4C6E4" />
+
+        <Style TargetType="Button">
+            <Setter Property="Foreground" Value="#E7EFFD" />
+            <Setter Property="Background" Value="#1A2639" />
+            <Setter Property="BorderBrush" Value="#3F577D" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="Padding" Value="10,6" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+        </Style>
+
+        <Style TargetType="TextBox">
+            <Setter Property="Background" Value="#0E1724" />
+            <Setter Property="Foreground" Value="{StaticResource DialogTextBrush}" />
+            <Setter Property="BorderBrush" Value="{StaticResource DialogBorderBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
+        </Style>
+
+        <Style TargetType="ComboBox">
+            <Setter Property="Background" Value="#0E1724" />
+            <Setter Property="Foreground" Value="{StaticResource DialogTextBrush}" />
+            <Setter Property="BorderBrush" Value="{StaticResource DialogBorderBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
+        </Style>
+
+        <Style TargetType="DataGridColumnHeader">
+            <Setter Property="Background" Value="#162233" />
+            <Setter Property="Foreground" Value="#DAE8FF" />
+            <Setter Property="BorderBrush" Value="#324662" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+        </Style>
+
+        <Style TargetType="DataGridCell">
+            <Setter Property="Background" Value="#0B121B" />
+            <Setter Property="Foreground" Value="{StaticResource DialogTextBrush}" />
+            <Setter Property="BorderBrush" Value="#23344D" />
+            <Setter Property="BorderThickness" Value="0,0,0,1" />
+        </Style>
+    </Window.Resources>
+
     <Grid Margin="12">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
@@ -15,7 +60,7 @@
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
-        <TextBlock Text="Manage OpenAI-Compatible Provider Loadouts"
+        <TextBlock Text="Manage provider settings"
                    Foreground="#E8EFFD"
                    FontSize="18"
                    FontWeight="SemiBold"

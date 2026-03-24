@@ -16,6 +16,7 @@ public partial class ThreadWindow : Window
 
     private bool _webViewReady;
     private bool _isDarkTheme;
+    private bool _hasReasoning;
     private int _reasoningChars;
     private int _answerChars;
     private DateTime _lastRenderAt = DateTime.MinValue;
@@ -34,9 +35,10 @@ public partial class ThreadWindow : Window
 
         _reasoningBuilder.Clear();
         _answerBuilder.Clear();
-        _reasoningBuilder.Append("> Waiting for reasoning stream…\n\n");
         _answerBuilder.Append($"# {topic}\n\n> Waiting for answer tokens…\n");
 
+        _hasReasoning = false;
+        SetReasoningVisible(false);
         _reasoningChars = 0;
         _answerChars = 0;
         _lastRenderAt = DateTime.MinValue;
@@ -51,6 +53,8 @@ public partial class ThreadWindow : Window
             if (_reasoningChars == 0)
             {
                 _reasoningBuilder.Clear();
+                _hasReasoning = true;
+                SetReasoningVisible(true);
             }
 
             _reasoningBuilder.Append(chunk.Text);
@@ -84,6 +88,8 @@ public partial class ThreadWindow : Window
         _answerBuilder.Clear();
         _reasoningBuilder.Append(cache.ReasoningMarkdown);
         _answerBuilder.Append(cache.AnswerMarkdown);
+        _hasReasoning = !string.IsNullOrWhiteSpace(cache.ReasoningMarkdown);
+        SetReasoningVisible(_hasReasoning);
         _reasoningChars = cache.ReasoningMarkdown.Length;
         _answerChars = cache.AnswerMarkdown.Length;
         StatusText.Text = "Loaded from cache";
@@ -187,6 +193,13 @@ public partial class ThreadWindow : Window
     {
         Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString(
             _isDarkTheme ? "#111721" : "#F5F9FF"));
+    }
+
+    private void SetReasoningVisible(bool visible)
+    {
+        ReasoningSection.Visibility = visible ? Visibility.Visible : Visibility.Collapsed;
+        ReasoningRow.Height = visible ? new GridLength(0.9, GridUnitType.Star) : new GridLength(0);
+        AnswerRow.Height = visible ? new GridLength(1.6, GridUnitType.Star) : new GridLength(1, GridUnitType.Star);
     }
 
     private static ThreadCachePayload DeserializeCache(string payload)
