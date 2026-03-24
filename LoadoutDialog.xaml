@@ -1,0 +1,67 @@
+<Window x:Class="Naveen_Sir.LoadoutDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Provider Loadouts"
+        Height="560"
+        Width="980"
+        MinHeight="520"
+        MinWidth="900"
+        WindowStartupLocation="CenterOwner"
+        Background="#101721">
+    <Grid Margin="12">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <TextBlock Text="Manage OpenAI-Compatible Provider Loadouts"
+                   Foreground="#E8EFFD"
+                   FontSize="18"
+                   FontWeight="SemiBold"
+                   Margin="0,0,0,10" />
+
+        <DataGrid x:Name="LoadoutsGrid"
+                  Grid.Row="1"
+                  AutoGenerateColumns="False"
+                  CanUserAddRows="False"
+                  HeadersVisibility="Column"
+                  Background="#0B121B"
+                  Foreground="#D7E2F7"
+                  BorderBrush="#2A3850"
+                  BorderThickness="1"
+                  GridLinesVisibility="Horizontal"
+                  SelectionMode="Single"
+                  SelectionUnit="FullRow">
+            <DataGrid.Columns>
+                <DataGridTextColumn Header="Name" Binding="{Binding Name, UpdateSourceTrigger=PropertyChanged}" Width="1.1*" />
+                <DataGridTextColumn Header="Endpoint" Binding="{Binding Endpoint, UpdateSourceTrigger=PropertyChanged}" Width="2.2*" />
+                <DataGridTextColumn Header="API Key" Binding="{Binding ApiKey, UpdateSourceTrigger=PropertyChanged}" Width="1.8*" />
+                <DataGridTextColumn Header="Model ID" Binding="{Binding ModelId, UpdateSourceTrigger=PropertyChanged}" Width="1.1*" />
+            </DataGrid.Columns>
+        </DataGrid>
+
+        <Grid Grid.Row="2" Margin="0,10,0,0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+
+            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                <Button Content="Add" Width="90" Margin="0,0,8,0" Click="OnAdd" />
+                <Button Content="Fork" Width="90" Margin="0,0,8,0" Click="OnFork" />
+                <Button Content="Delete" Width="90" Click="OnDelete" />
+                <TextBlock Text="Active:" Foreground="#B4C6E4" VerticalAlignment="Center" Margin="18,0,8,0" />
+                <ComboBox x:Name="ActiveLoadoutCombo"
+                          Width="260"
+                          DisplayMemberPath="Name"
+                          SelectedValuePath="Id" />
+            </StackPanel>
+
+            <StackPanel Grid.Column="1" Orientation="Horizontal">
+                <Button Content="Cancel" Width="110" Margin="0,0,8,0" Click="OnCancel" />
+                <Button Content="Save" Width="110" Click="OnSave" />
+            </StackPanel>
+        </Grid>
+    </Grid>
+</Window>

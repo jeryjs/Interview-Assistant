@@ -1,0 +1,44 @@
+<Window x:Class="Naveen_Sir.ThreadWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:wpf="clr-namespace:Microsoft.Web.WebView2.Wpf;assembly=Microsoft.Web.WebView2.Wpf"
+        Title="Topic Thread"
+        Width="980"
+        Height="760"
+        MinWidth="760"
+        MinHeight="560"
+        WindowStartupLocation="CenterOwner"
+        Background="#111721">
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <Border Grid.Row="0" Background="#172131" BorderBrush="#2A3A51" BorderThickness="0,0,0,1">
+            <Grid Margin="12,10">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+
+                <StackPanel>
+                    <TextBlock x:Name="TopicTitleText" Foreground="#F5F8FF" FontSize="20" FontWeight="SemiBold" />
+                    <TextBlock x:Name="StatusText" Foreground="#A8BCDC" FontSize="12" />
+                </StackPanel>
+
+                <Button Grid.Column="1"
+                        Content="Close"
+                        Width="92"
+                        Height="32"
+                        Foreground="#EAF1FF"
+                        Background="#2A3850"
+                        BorderBrush="#465F86"
+                        BorderThickness="1"
+                        Click="OnCloseClick" />
+            </Grid>
+        </Border>
+
+        <wpf:WebView2 x:Name="MarkdownView" Grid.Row="1" Margin="0" />
+    </Grid>
+</Window>
