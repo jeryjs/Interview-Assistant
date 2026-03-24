@@ -1,3 +1,4 @@
+using System.IO;
 using System.Text;
 using Whisper.net;
 using Whisper.net.Ggml;
@@ -86,7 +87,8 @@ public sealed class WhisperTranscriptionService : IDisposable
         }
 
         StatusChanged?.Invoke("Downloading local whisper model (base.en)...");
-        await using var modelStream = await WhisperGgmlDownloader.Default.GetGgmlModelAsync(GgmlType.BaseEn, cancellationToken);
+        cancellationToken.ThrowIfCancellationRequested();
+        await using var modelStream = await WhisperGgmlDownloader.Default.GetGgmlModelAsync(GgmlType.BaseEn);
         await using var output = File.Create(autoModelPath);
         await modelStream.CopyToAsync(output, cancellationToken);
         StatusChanged?.Invoke("Whisper model download completed");

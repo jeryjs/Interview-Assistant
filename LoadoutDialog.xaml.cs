@@ -76,6 +76,12 @@ public partial class LoadoutDialog : Window
 
     private void OnSave(object sender, RoutedEventArgs e)
     {
+        foreach (var loadout in _editableLoadouts)
+        {
+            loadout.Temperature = Math.Clamp(loadout.Temperature, 0f, 1.5f);
+            loadout.MaxTokens = Math.Clamp(loadout.MaxTokens, 128, 4096);
+        }
+
         var active = ActiveLoadoutCombo.SelectedItem as ProviderLoadout ?? _editableLoadouts[0];
         ResultLoadouts = _editableLoadouts.ToList();
         ResultActiveLoadoutId = active.Id;

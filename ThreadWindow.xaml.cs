@@ -1,7 +1,8 @@
 using System.Text;
 using Markdig;
-using Microsoft.Web.WebView2.Core;
 using Naveen_Sir.Services;
+using System.Windows;
+using System.Windows.Media;
 
 namespace Naveen_Sir;
 
@@ -76,45 +77,43 @@ public partial class ThreadWindow : Window
         var codeBackground = _isDarkTheme ? "#152235" : "#EAF2FF";
         var border = _isDarkTheme ? "#2F4260" : "#C9D9EE";
 
-        return $"""
-<!DOCTYPE html>
+                return $@"<!DOCTYPE html>
 <html>
 <head>
-  <meta charset="utf-8" />
-  <style>
-    body {{
-      margin: 0;
-      padding: 26px;
-      color: {foreground};
-      background: {background};
-      font-family: Segoe UI, Inter, system-ui, sans-serif;
-      line-height: 1.6;
-      font-size: 14px;
-    }}
-    h1,h2,h3,h4 {{ margin-top: 22px; margin-bottom: 10px; }}
-    pre, code {{
-      background: {codeBackground};
-      border: 1px solid {border};
-      border-radius: 8px;
-    }}
-    code {{ padding: 2px 6px; }}
-    pre {{ padding: 12px; overflow-x: auto; }}
-    blockquote {{
-      border-left: 3px solid {border};
-      margin-left: 0;
-      padding-left: 12px;
-      opacity: 0.92;
-    }}
-    table {{ border-collapse: collapse; width: 100%; }}
-    th, td {{ border: 1px solid {border}; padding: 8px; text-align: left; }}
-    a {{ color: #72A6FF; }}
-  </style>
+    <meta charset=""utf-8"" />
+    <style>
+        body {{
+            margin: 0;
+            padding: 26px;
+            color: {foreground};
+            background: {background};
+            font-family: Segoe UI, Inter, system-ui, sans-serif;
+            line-height: 1.6;
+            font-size: 14px;
+        }}
+        h1,h2,h3,h4 {{ margin-top: 22px; margin-bottom: 10px; }}
+        pre, code {{
+            background: {codeBackground};
+            border: 1px solid {border};
+            border-radius: 8px;
+        }}
+        code {{ padding: 2px 6px; }}
+        pre {{ padding: 12px; overflow-x: auto; }}
+        blockquote {{
+            border-left: 3px solid {border};
+            margin-left: 0;
+            padding-left: 12px;
+            opacity: 0.92;
+        }}
+        table {{ border-collapse: collapse; width: 100%; }}
+        th, td {{ border: 1px solid {border}; padding: 8px; text-align: left; }}
+        a {{ color: #72A6FF; }}
+    </style>
 </head>
 <body>
 {htmlBody}
 </body>
-</html>
-""";
+</html>";
     }
 
     private void ApplyTheme()
