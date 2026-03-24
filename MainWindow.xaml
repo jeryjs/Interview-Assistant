@@ -116,13 +116,15 @@
 
                 <Grid Grid.Column="1" Margin="10,0,0,0">
                     <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="320" />
                         <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
 
                     <TextBlock x:Name="StatusText"
                                Grid.Column="0"
                                Foreground="{DynamicResource SecondaryTextBrush}"
+                               TextTrimming="CharacterEllipsis"
+                               TextWrapping="NoWrap"
                                VerticalAlignment="Center"
                                Margin="0,0,12,0" />
 

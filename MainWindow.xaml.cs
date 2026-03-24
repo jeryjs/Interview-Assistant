@@ -103,7 +103,18 @@ public partial class MainWindow : Window
 
     private void SetStatus(string message)
     {
-        StatusText.Text = message;
+        var normalized = string.IsNullOrWhiteSpace(message)
+            ? string.Empty
+            : message.Replace('\r', ' ').Replace('\n', ' ').Trim();
+
+        const int maxLength = 160;
+        if (normalized.Length > maxLength)
+        {
+            normalized = normalized[..maxLength] + "…";
+        }
+
+        StatusText.Text = normalized;
+        StatusText.ToolTip = message;
     }
 
     private async void OnCaptureToggleChanged(object sender, RoutedEventArgs e)
@@ -215,6 +226,10 @@ public partial class MainWindow : Window
         catch (OperationCanceledException)
         {
             SetStatus("Thread stream canceled");
+        }
+        catch (Exception ex)
+        {
+            SetStatus($"Thread generation failed: {ex.Message}");
         }
     }
 

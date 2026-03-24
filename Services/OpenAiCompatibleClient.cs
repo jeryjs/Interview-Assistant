@@ -104,7 +104,8 @@ public sealed class OpenAiCompatibleClient
         var body = await response.Content.ReadAsStringAsync(cancellationToken);
         if (!response.IsSuccessStatusCode)
         {
-            throw new HttpRequestException($"Provider error ({(int)response.StatusCode}): {body}");
+            var summarizedBody = SummarizeProviderBody(body);
+            throw new HttpRequestException($"Provider error ({(int)response.StatusCode}): {summarizedBody}");
         }
 
         if (!IsServerSentEvent(response.Content.Headers.ContentType?.MediaType))
@@ -265,5 +266,50 @@ Existing chips:
         }
 
         return string.Empty;
+    }
+
+    private static string SummarizeProviderBody(string body)
+    {
+        if (string.IsNullOrWhiteSpace(body))
+        {
+            return "empty response body";
+        }
+
+        string text;
+        try
+        {
+            using var json = JsonDocument.Parse(body);
+            if (json.RootElement.TryGetProperty("error", out var error))
+            {
+                if (error.ValueKind == JsonValueKind.String)
+                {
+                    text = error.GetString() ?? string.Empty;
+                }
+                else if (error.TryGetProperty("message", out var message) && message.ValueKind == JsonValueKind.String)
+                {
+                    text = message.GetString() ?? string.Empty;
+                }
+                else
+                {
+                    text = error.ToString();
+                }
+            }
+            else
+            {
+                text = body;
+            }
+        }
+        catch
+        {
+            text = body;
+        }
+
+        text = text.Replace('\r', ' ').Replace('\n', ' ').Trim();
+        if (text.Length > 220)
+        {
+            text = text[..220] + "…";
+        }
+
+        return text;
     }
 }

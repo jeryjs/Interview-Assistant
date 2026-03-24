@@ -330,39 +330,26 @@ public sealed class AssistantEngine : IDisposable
             transcriptContext = "No recent transcript context available.";
         }
 
-        IAsyncEnumerable<string> stream;
         try
         {
-            stream = _providerClient.StreamTopicMarkdownAsync(loadout, topic, transcriptContext, cancellationToken);
+            await foreach (var chunk in _providerClient.StreamTopicMarkdownAsync(loadout, topic, transcriptContext, cancellationToken).WithCancellation(cancellationToken))
+            {
+                yield return chunk;
+            }
         }
-        catch
+        catch (OperationCanceledException)
         {
-            stream = FallbackMarkdownAsync(topic);
+            throw;
         }
-
-        await foreach (var chunk in stream.WithCancellation(cancellationToken))
+        catch (Exception ex)
         {
-            yield return chunk;
-        }
-    }
+            var safeMessage = ex.Message.Replace('\r', ' ').Replace('\n', ' ').Trim();
+            if (safeMessage.Length > 220)
+            {
+                safeMessage = safeMessage[..220] + "…";
+            }
 
-    private static async IAsyncEnumerable<string> FallbackMarkdownAsync(
-        string topic,
-        [EnumeratorCancellation] CancellationToken cancellationToken = default)
-    {
-        var chunks = new[]
-        {
-            $"# {topic}\n\n",
-            "## Fast answer\nUse a concise definition, one practical example, and one tradeoff.\n\n",
-            "## Depth checklist\n- Internal mechanics\n- Performance considerations\n- Failure modes\n- Testing strategy\n\n",
-            "## Interview Q/A\n**Q:** Why this approach?\n**A:** It provides predictable behavior, measurable performance, and simpler maintenance.\n",
-        };
-
-        foreach (var chunk in chunks)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            await Task.Delay(80, cancellationToken);
-            yield return chunk;
+            yield return $"# {topic}\n\n> Provider call failed.\n\n`{safeMessage}`\n";
         }
     }
 

@@ -32,11 +32,23 @@ public sealed class AppState
             MaxChipCount = 220;
         }
 
+        var now = DateTime.UtcNow;
+        var validWindow = TimeSpan.FromHours(6);
+
         ChipFeed = ChipFeed
-            .Where(static chip => !string.IsNullOrWhiteSpace(chip.Text))
+            .Where(chip =>
+                !string.IsNullOrWhiteSpace(chip.Text)
+                && !string.IsNullOrWhiteSpace(chip.SourceProviderName)
+                && !string.IsNullOrWhiteSpace(chip.SourceModel)
+                && now - chip.CreatedAtUtc <= validWindow)
             .OrderBy(chip => chip.CreatedAtUtc)
             .TakeLast(MaxChipCount)
             .ToList();
+
+        var validChipIds = ChipFeed.Select(chip => chip.Id).ToHashSet(StringComparer.Ordinal);
+        ThreadCache = ThreadCache
+            .Where(entry => validChipIds.Contains(entry.Key) && !string.IsNullOrWhiteSpace(entry.Value))
+            .ToDictionary(static entry => entry.Key, static entry => entry.Value);
     }
 
     public ProviderLoadout ResolveActiveLoadout()
