@@ -320,7 +320,8 @@ public partial class MainWindow : Window
 
     private void UpdatePauseUi(bool isPaused)
     {
-        PauseToggle.Content = isPaused ? "▶" : "⏸";
+        PauseToggle.Tag = isPaused ? "▶" : "⏸";
+        PauseToggle.Content = isPaused ? "Resume" : "Pause";
         PauseToggle.ToolTip = isPaused ? "Resume all" : "Pause all";
     }
 
@@ -583,21 +584,21 @@ public partial class MainWindow : Window
 
         if (_state.ThreadCache.TryGetValue(chip.Id, out var cachedThread))
         {
-            await _threadWindow.LoadMarkdownAsync(cachedThread);
+            await _threadWindow.LoadFromCacheAsync(cachedThread);
             SetStatus("Loaded cached thread");
             return;
         }
 
         try
         {
-            await foreach (var chunk in _assistantEngine.StreamTopicOverviewAsync(chip.Text, _state.ResolveActiveLoadout(), cancellationToken))
+            await foreach (var chunk in _assistantEngine.StreamTopicOverviewStructuredAsync(chip.Text, _state.ResolveActiveLoadout(), cancellationToken))
             {
                 if (_threadWindow is null)
                 {
                     return;
                 }
 
-                await _threadWindow.AppendMarkdownAsync(chunk);
+                await _threadWindow.AppendChunkAsync(chunk);
             }
 
             if (_threadWindow is not null)
@@ -607,7 +608,7 @@ public partial class MainWindow : Window
 
             if (_threadWindow is not null)
             {
-                _state.ThreadCache[chip.Id] = _threadWindow.GetCurrentMarkdown();
+                _state.ThreadCache[chip.Id] = _threadWindow.GetCurrentCachePayload();
             }
 
             await AppStateStore.SaveAsync(_state);

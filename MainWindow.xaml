@@ -43,6 +43,43 @@
             </Setter>
         </Style>
 
+        <Style TargetType="Button" x:Key="ToolbarButtonStyle" BasedOn="{StaticResource ControlButtonStyle}">
+            <Setter Property="Padding" Value="10,6" />
+            <Setter Property="MinWidth" Value="38" />
+            <Setter Property="Margin" Value="0,0,8,0" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Border"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="9">
+                            <StackPanel Orientation="Horizontal"
+                                        HorizontalAlignment="Center"
+                                        VerticalAlignment="Center"
+                                        Margin="8,0">
+                                <TextBlock Text="{TemplateBinding Tag}" FontSize="13" VerticalAlignment="Center" />
+                                <TextBlock x:Name="LabelText"
+                                           Text="{TemplateBinding Content}"
+                                           Margin="6,0,0,0"
+                                           Visibility="Collapsed"
+                                           VerticalAlignment="Center" />
+                            </StackPanel>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="LabelText" Property="Visibility" Value="Visible" />
+                            </Trigger>
+                            <Trigger Property="IsKeyboardFocused" Value="True">
+                                <Setter TargetName="LabelText" Property="Visibility" Value="Visible" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
         <Style TargetType="ToggleButton" x:Key="ControlToggleStyle">
             <Setter Property="Foreground" Value="{DynamicResource PrimaryTextBrush}" />
             <Setter Property="Background" Value="{DynamicResource ControlBackgroundBrush}" />
@@ -60,6 +97,47 @@
                             <Trigger Property="IsChecked" Value="True">
                                 <Setter TargetName="Border" Property="Background" Value="#2D4D78" />
                                 <Setter TargetName="Border" Property="BorderBrush" Value="#7EA8E5" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style TargetType="ToggleButton" x:Key="ToolbarToggleStyle" BasedOn="{StaticResource ControlToggleStyle}">
+            <Setter Property="Padding" Value="10,6" />
+            <Setter Property="MinWidth" Value="38" />
+            <Setter Property="Margin" Value="0,0,8,0" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ToggleButton">
+                        <Border x:Name="Border"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="9">
+                            <StackPanel Orientation="Horizontal"
+                                        HorizontalAlignment="Center"
+                                        VerticalAlignment="Center"
+                                        Margin="8,0">
+                                <TextBlock Text="{TemplateBinding Tag}" FontSize="13" VerticalAlignment="Center" />
+                                <TextBlock x:Name="LabelText"
+                                           Text="{TemplateBinding Content}"
+                                           Margin="6,0,0,0"
+                                           Visibility="Collapsed"
+                                           VerticalAlignment="Center" />
+                            </StackPanel>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="Border" Property="Background" Value="#2D4D78" />
+                                <Setter TargetName="Border" Property="BorderBrush" Value="#7EA8E5" />
+                            </Trigger>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="LabelText" Property="Visibility" Value="Visible" />
+                            </Trigger>
+                            <Trigger Property="IsKeyboardFocused" Value="True">
+                                <Setter TargetName="LabelText" Property="Visibility" Value="Visible" />
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -144,15 +222,15 @@
                                     IsSnapToTickEnabled="True"
                                     ValueChanged="OnContextWindowValueChanged" />
                         </StackPanel>
-                        <ToggleButton x:Name="PauseToggle" Style="{StaticResource ControlToggleStyle}" Content="⏸" ToolTip="Pause all" Checked="OnPauseToggleChanged" Unchecked="OnPauseToggleChanged" />
-                        <ToggleButton x:Name="TranscriptVisibilityToggle" Style="{StaticResource ControlToggleStyle}" Content="Tx" ToolTip="Show transcript events" Checked="OnTranscriptVisibilityToggleChanged" Unchecked="OnTranscriptVisibilityToggleChanged" />
-                        <ToggleButton x:Name="MicToggle" Style="{StaticResource ControlToggleStyle}" Content="Mic" Checked="OnCaptureToggleChanged" Unchecked="OnCaptureToggleChanged" />
-                        <ToggleButton x:Name="SystemToggle" Style="{StaticResource ControlToggleStyle}" Content="System" Checked="OnCaptureToggleChanged" Unchecked="OnCaptureToggleChanged" />
-                        <ToggleButton x:Name="ScreenToggle" Style="{StaticResource ControlToggleStyle}" Content="Screen" Checked="OnCaptureToggleChanged" Unchecked="OnCaptureToggleChanged" />
-                        <Button x:Name="ScreenSourceButton" Style="{StaticResource ControlButtonStyle}" Content="⚙" Width="34" Padding="0" Click="OnOpenScreenSourceSettings" ToolTip="Screen source settings" />
-                        <ToggleButton x:Name="TopmostToggle" Style="{StaticResource ControlToggleStyle}" Content="Pin Top" Checked="OnPinTopToggleChanged" Unchecked="OnPinTopToggleChanged" />
-                        <Button Style="{StaticResource ControlButtonStyle}" Content="Loadouts" Click="OnOpenSettings" />
-                        <Button Style="{StaticResource ControlButtonStyle}" Content="Clear Chips" Click="OnClearChips" />
+                        <ToggleButton x:Name="PauseToggle" Style="{StaticResource ToolbarToggleStyle}" Tag="⏸" Content="Pause" ToolTip="Pause all" Checked="OnPauseToggleChanged" Unchecked="OnPauseToggleChanged" />
+                        <ToggleButton x:Name="TranscriptVisibilityToggle" Style="{StaticResource ToolbarToggleStyle}" Tag="📝" Content="Transcript" ToolTip="Show transcript events" Checked="OnTranscriptVisibilityToggleChanged" Unchecked="OnTranscriptVisibilityToggleChanged" />
+                        <ToggleButton x:Name="MicToggle" Style="{StaticResource ToolbarToggleStyle}" Tag="🎙" Content="Mic" Checked="OnCaptureToggleChanged" Unchecked="OnCaptureToggleChanged" />
+                        <ToggleButton x:Name="SystemToggle" Style="{StaticResource ToolbarToggleStyle}" Tag="🔊" Content="System" Checked="OnCaptureToggleChanged" Unchecked="OnCaptureToggleChanged" />
+                        <ToggleButton x:Name="ScreenToggle" Style="{StaticResource ToolbarToggleStyle}" Tag="🖥" Content="Screen" Checked="OnCaptureToggleChanged" Unchecked="OnCaptureToggleChanged" />
+                        <Button x:Name="ScreenSourceButton" Style="{StaticResource ToolbarButtonStyle}" Tag="⚙" Content="Source" Click="OnOpenScreenSourceSettings" ToolTip="Screen source settings" />
+                        <ToggleButton x:Name="TopmostToggle" Style="{StaticResource ToolbarToggleStyle}" Tag="📌" Content="Pin Top" Checked="OnPinTopToggleChanged" Unchecked="OnPinTopToggleChanged" />
+                        <Button Style="{StaticResource ToolbarButtonStyle}" Tag="⚙" Content="Settings" Click="OnOpenSettings" />
+                        <Button Style="{StaticResource ToolbarButtonStyle}" Tag="🧹" Content="Clear all" Click="OnClearChips" />
                     </WrapPanel>
                 </Grid>
             </Grid>

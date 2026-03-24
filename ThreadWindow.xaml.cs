@@ -1,5 +1,7 @@
 using System.Text;
+using System.Text.Json;
 using Markdig;
+using Naveen_Sir.Models;
 using Naveen_Sir.Services;
 using System.Windows;
 using System.Windows.Media;
@@ -9,12 +11,13 @@ namespace Naveen_Sir;
 public partial class ThreadWindow : Window
 {
     private readonly MarkdownPipeline _markdownPipeline = new MarkdownPipelineBuilder().UseAdvancedExtensions().Build();
-    private readonly StringBuilder _markdownBuilder = new();
+    private readonly StringBuilder _reasoningBuilder = new();
+    private readonly StringBuilder _answerBuilder = new();
 
     private bool _webViewReady;
     private bool _isDarkTheme;
-    private bool _receivedFirstChunk;
-    private int _streamedCharCount;
+    private int _reasoningChars;
+    private int _answerChars;
     private DateTime _lastRenderAt = DateTime.MinValue;
 
     public ThreadWindow()
@@ -28,57 +31,74 @@ public partial class ThreadWindow : Window
     {
         TopicTitleText.Text = topic;
         StatusText.Text = "Connecting…";
-        _markdownBuilder.Clear();
-        _markdownBuilder.Append($"# {topic}\n\n> Preparing stream…\n\n- establishing provider connection\n- waiting for first tokens\n");
-        _receivedFirstChunk = false;
-        _streamedCharCount = 0;
+
+        _reasoningBuilder.Clear();
+        _answerBuilder.Clear();
+        _reasoningBuilder.Append("> Waiting for reasoning stream…\n\n");
+        _answerBuilder.Append($"# {topic}\n\n> Waiting for answer tokens…\n");
+
+        _reasoningChars = 0;
+        _answerChars = 0;
         _lastRenderAt = DateTime.MinValue;
-        await RenderAsync();
+
+        await RenderAsync(force: true);
     }
 
-    public async Task LoadMarkdownAsync(string markdown)
+    public async Task AppendChunkAsync(TopicStreamChunk chunk)
     {
-        _markdownBuilder.Clear();
-        _markdownBuilder.Append(markdown);
-        StatusText.Text = "Loaded from cache";
-        await RenderAsync();
-    }
-
-    public async Task AppendMarkdownAsync(string chunk)
-    {
-        if (!_receivedFirstChunk)
+        if (chunk.Channel == TopicStreamChannel.Reasoning)
         {
-            _receivedFirstChunk = true;
-            _markdownBuilder.Clear();
+            if (_reasoningChars == 0)
+            {
+                _reasoningBuilder.Clear();
+            }
+
+            _reasoningBuilder.Append(chunk.Text);
+            _reasoningChars += chunk.Text.Length;
+        }
+        else
+        {
+            if (_answerChars == 0)
+            {
+                _answerBuilder.Clear();
+            }
+
+            _answerBuilder.Append(chunk.Text);
+            _answerChars += chunk.Text.Length;
         }
 
-        _markdownBuilder.Append(chunk);
-        _streamedCharCount += chunk.Length;
-        StatusText.Text = $"Streaming… {_streamedCharCount} chars";
-
-        var now = DateTime.UtcNow;
-        if ((now - _lastRenderAt).TotalMilliseconds < 120)
-        {
-            return;
-        }
-
-        await RenderAsync();
-        _lastRenderAt = now;
+        StatusText.Text = $"Streaming… reasoning {_reasoningChars} chars · answer {_answerChars} chars";
+        await RenderAsync(force: false);
     }
 
     public async Task FlushAsync()
     {
-        await RenderAsync();
-        _lastRenderAt = DateTime.UtcNow;
-        if (_receivedFirstChunk)
-        {
-            StatusText.Text = "Stream complete";
-        }
+        await RenderAsync(force: true);
+        StatusText.Text = "Stream complete";
     }
 
-    public string GetCurrentMarkdown()
+    public async Task LoadFromCacheAsync(string cachePayload)
     {
-        return _markdownBuilder.ToString();
+        var cache = DeserializeCache(cachePayload);
+        _reasoningBuilder.Clear();
+        _answerBuilder.Clear();
+        _reasoningBuilder.Append(cache.ReasoningMarkdown);
+        _answerBuilder.Append(cache.AnswerMarkdown);
+        _reasoningChars = cache.ReasoningMarkdown.Length;
+        _answerChars = cache.AnswerMarkdown.Length;
+        StatusText.Text = "Loaded from cache";
+        await RenderAsync(force: true);
+    }
+
+    public string GetCurrentCachePayload()
+    {
+        var payload = new ThreadCachePayload
+        {
+            ReasoningMarkdown = _reasoningBuilder.ToString(),
+            AnswerMarkdown = _answerBuilder.ToString(),
+        };
+
+        return JsonSerializer.Serialize(payload);
     }
 
     private async Task EnsureWebViewAsync()
@@ -88,18 +108,33 @@ public partial class ThreadWindow : Window
             return;
         }
 
-        await MarkdownView.EnsureCoreWebView2Async();
-        MarkdownView.CoreWebView2.Settings.AreDefaultContextMenusEnabled = true;
-        MarkdownView.CoreWebView2.Settings.AreDevToolsEnabled = false;
+        await ReasoningView.EnsureCoreWebView2Async();
+        await AnswerView.EnsureCoreWebView2Async();
+
+        ReasoningView.CoreWebView2.Settings.AreDefaultContextMenusEnabled = true;
+        ReasoningView.CoreWebView2.Settings.AreDevToolsEnabled = false;
+        AnswerView.CoreWebView2.Settings.AreDefaultContextMenusEnabled = true;
+        AnswerView.CoreWebView2.Settings.AreDevToolsEnabled = false;
+
         _webViewReady = true;
     }
 
-    private async Task RenderAsync()
+    private async Task RenderAsync(bool force)
     {
+        var now = DateTime.UtcNow;
+        if (!force && (now - _lastRenderAt).TotalMilliseconds < 80)
+        {
+            return;
+        }
+
         await EnsureWebViewAsync();
-        var markdown = _markdownBuilder.ToString();
-        var htmlBody = Markdown.ToHtml(markdown, _markdownPipeline);
-        MarkdownView.NavigateToString(BuildHtmlDocument(htmlBody));
+        var reasoningHtml = Markdown.ToHtml(_reasoningBuilder.ToString(), _markdownPipeline);
+        var answerHtml = Markdown.ToHtml(_answerBuilder.ToString(), _markdownPipeline);
+
+        ReasoningView.NavigateToString(BuildHtmlDocument(reasoningHtml));
+        AnswerView.NavigateToString(BuildHtmlDocument(answerHtml));
+
+        _lastRenderAt = now;
     }
 
     private string BuildHtmlDocument(string htmlBody)
@@ -109,36 +144,36 @@ public partial class ThreadWindow : Window
         var codeBackground = _isDarkTheme ? "#152235" : "#EAF2FF";
         var border = _isDarkTheme ? "#2F4260" : "#C9D9EE";
 
-                return $@"<!DOCTYPE html>
+        return $@"<!DOCTYPE html>
 <html>
 <head>
     <meta charset=""utf-8"" />
     <style>
         body {{
             margin: 0;
-            padding: 26px;
+            padding: 14px;
             color: {foreground};
             background: {background};
             font-family: Segoe UI, Inter, system-ui, sans-serif;
-            line-height: 1.6;
-            font-size: 14px;
+            line-height: 1.5;
+            font-size: 13px;
         }}
-        h1,h2,h3,h4 {{ margin-top: 22px; margin-bottom: 10px; }}
+        h1,h2,h3,h4 {{ margin-top: 18px; margin-bottom: 8px; }}
         pre, code {{
             background: {codeBackground};
             border: 1px solid {border};
             border-radius: 8px;
         }}
         code {{ padding: 2px 6px; }}
-        pre {{ padding: 12px; overflow-x: auto; }}
+        pre {{ padding: 10px; overflow-x: auto; }}
         blockquote {{
             border-left: 3px solid {border};
             margin-left: 0;
-            padding-left: 12px;
+            padding-left: 10px;
             opacity: 0.92;
         }}
         table {{ border-collapse: collapse; width: 100%; }}
-        th, td {{ border: 1px solid {border}; padding: 8px; text-align: left; }}
+        th, td {{ border: 1px solid {border}; padding: 6px; text-align: left; }}
         a {{ color: #72A6FF; }}
     </style>
 </head>
@@ -150,18 +185,45 @@ public partial class ThreadWindow : Window
 
     private void ApplyTheme()
     {
-        if (_isDarkTheme)
+        Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString(
+            _isDarkTheme ? "#111721" : "#F5F9FF"));
+    }
+
+    private static ThreadCachePayload DeserializeCache(string payload)
+    {
+        if (string.IsNullOrWhiteSpace(payload))
         {
-            Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#111721"));
+            return new ThreadCachePayload();
         }
-        else
+
+        try
         {
-            Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#F5F9FF"));
+            var parsed = JsonSerializer.Deserialize<ThreadCachePayload>(payload);
+            if (parsed is not null)
+            {
+                return parsed;
+            }
         }
+        catch
+        {
+            // old cache format fallback
+        }
+
+        return new ThreadCachePayload
+        {
+            AnswerMarkdown = payload,
+            ReasoningMarkdown = string.Empty,
+        };
     }
 
     private void OnCloseClick(object sender, RoutedEventArgs e)
     {
         Close();
+    }
+
+    private sealed class ThreadCachePayload
+    {
+        public string ReasoningMarkdown { get; set; } = string.Empty;
+        public string AnswerMarkdown { get; set; } = string.Empty;
     }
 }

@@ -1,5 +1,6 @@
 using System.Runtime.CompilerServices;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Threading.Channels;
 using Naveen_Sir.Models;
 
@@ -18,7 +19,10 @@ public sealed class AssistantEngine : IDisposable
     private readonly List<TranscriptEntry> _transcriptHistory = [];
     private readonly HashSet<string> _chipTextSet = new(StringComparer.OrdinalIgnoreCase);
     private readonly List<string> _chipOrder = [];
+    private readonly List<(DateTimeOffset Timestamp, string Text)> _chipHistory = [];
     private readonly SemaphoreSlim _recommendationLock = new(1, 1);
+
+    private const string ChipDelimiter = "|||";
 
     private CancellationTokenSource? _runCts;
     private Task? _transcriptionLoopTask;
@@ -316,19 +320,35 @@ public sealed class AssistantEngine : IDisposable
     private async Task GenerateRecommendationsAsync(CancellationToken cancellationToken)
     {
         string transcriptContext;
+        string latestFocus;
         List<string> currentChips;
         var contextWindow = GetContextWindow();
 
         lock (_stateLock)
         {
             var cutoff = DateTimeOffset.UtcNow - contextWindow;
+            var recentEntries = _transcriptHistory
+                .Where(item => item.Timestamp >= cutoff)
+                .OrderBy(item => item.Timestamp)
+                .ToList();
+
             transcriptContext = string.Join(
                 "\n",
-                _transcriptHistory
-                    .Where(item => item.Timestamp >= cutoff)
-                    .Select(item => item.ToDisplayLine()));
+                recentEntries.Select(item => item.ToDisplayLine()));
 
-            currentChips = _chipOrder.TakeLast(60).ToList();
+            latestFocus = string.Join(
+                "\n",
+                recentEntries
+                    .TakeLast(2)
+                    .Select(item => item.Text.Trim()));
+
+            var chipCutoff = DateTimeOffset.UtcNow - TimeSpan.FromSeconds(Math.Max(20, _state.ContextWindowSeconds * 2));
+            currentChips = _chipHistory
+                .Where(item => item.Timestamp >= chipCutoff)
+                .Select(item => item.Text)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .TakeLast(16)
+                .ToList();
         }
 
         if (string.IsNullOrWhiteSpace(transcriptContext))
@@ -346,7 +366,7 @@ public sealed class AssistantEngine : IDisposable
 
         var streamBuffer = new StringBuilder();
         var generatedChips = new List<ChipItem>();
-        await foreach (var chunk in _providerClient.StreamRecommendationTextAsync(loadout, chipModelId, transcriptContext, frames, currentChips, includeImages: _screenEnabled, cancellationToken))
+        await foreach (var chunk in _providerClient.StreamRecommendationTextAsync(loadout, chipModelId, transcriptContext, latestFocus, frames, currentChips, includeImages: _screenEnabled, cancellationToken))
         {
             streamBuffer.Append(chunk);
             foreach (var chip in DrainChipsFromBuffer(streamBuffer))
@@ -376,31 +396,38 @@ public sealed class AssistantEngine : IDisposable
 
     private IEnumerable<string> DrainChipsFromBuffer(StringBuilder streamBuffer)
     {
-        var text = streamBuffer.ToString();
-        var lines = text.Split('\n');
-        if (lines.Length <= 1)
+        var output = new List<string>();
+
+        while (true)
         {
-            return [];
+            var text = streamBuffer.ToString();
+            var delimiterIndex = text.IndexOf(ChipDelimiter, StringComparison.Ordinal);
+            if (delimiterIndex < 0)
+            {
+                break;
+            }
+
+            var segment = text[..delimiterIndex];
+            streamBuffer.Clear();
+            streamBuffer.Append(text[(delimiterIndex + ChipDelimiter.Length)..]);
+
+            output.AddRange(ParseChips(segment));
         }
 
-        var output = lines[..^1]
-            .Select(NormalizeChip)
-            .Where(static chip => !string.IsNullOrWhiteSpace(chip))
-            .ToList();
-
-        streamBuffer.Clear();
-        streamBuffer.Append(lines[^1]);
         return output;
     }
 
     private static IReadOnlyList<string> ParseChips(string rawText)
     {
-        return rawText
-            .Split(['\n', '|', ';'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+        var normalizedRaw = rawText.Replace(ChipDelimiter, "\n", StringComparison.Ordinal);
+        normalizedRaw = Regex.Replace(normalizedRaw, @"(?<!^)\s+(\d+\)\s*)", "\n$1", RegexOptions.CultureInvariant);
+
+        return normalizedRaw
+            .Split(['\n', '|', ';', '•'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
             .Select(NormalizeChip)
             .Where(static chip => !string.IsNullOrWhiteSpace(chip))
             .Distinct(StringComparer.OrdinalIgnoreCase)
-            .Take(12)
+            .Take(6)
             .ToList();
     }
 
@@ -444,6 +471,12 @@ public sealed class AssistantEngine : IDisposable
             {
                 _chipOrder.RemoveRange(0, _chipOrder.Count - 500);
             }
+
+            _chipHistory.Add((DateTimeOffset.UtcNow, chipText));
+            if (_chipHistory.Count > 1200)
+            {
+                _chipHistory.RemoveRange(0, _chipHistory.Count - 1200);
+            }
         }
 
         var palette = ChipColorService.ForText(chipText);
@@ -460,7 +493,7 @@ public sealed class AssistantEngine : IDisposable
         };
     }
 
-    public async IAsyncEnumerable<string> StreamTopicOverviewAsync(
+    public async IAsyncEnumerable<TopicStreamChunk> StreamTopicOverviewStructuredAsync(
         string topic,
         ProviderLoadout loadout,
         [EnumeratorCancellation] CancellationToken cancellationToken)
@@ -483,9 +516,23 @@ public sealed class AssistantEngine : IDisposable
         }
 
         var topicModelId = loadout.ResolveTopicModelId();
-        await foreach (var chunk in _providerClient.StreamTopicMarkdownAsync(loadout, topicModelId, topic, transcriptContext, cancellationToken).WithCancellation(cancellationToken))
+        await foreach (var chunk in _providerClient.StreamTopicStructuredAsync(loadout, topicModelId, topic, transcriptContext, cancellationToken).WithCancellation(cancellationToken))
         {
             yield return chunk;
+        }
+    }
+
+    public async IAsyncEnumerable<string> StreamTopicOverviewAsync(
+        string topic,
+        ProviderLoadout loadout,
+        [EnumeratorCancellation] CancellationToken cancellationToken)
+    {
+        await foreach (var chunk in StreamTopicOverviewStructuredAsync(topic, loadout, cancellationToken).WithCancellation(cancellationToken))
+        {
+            if (chunk.Channel == TopicStreamChannel.Answer)
+            {
+                yield return chunk.Text;
+            }
         }
     }
 
