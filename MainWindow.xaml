@@ -129,9 +129,11 @@
                                Margin="0,0,12,0" />
 
                     <WrapPanel Grid.Column="1" VerticalAlignment="Center">
+                        <ToggleButton x:Name="PauseToggle" Style="{StaticResource ControlToggleStyle}" Content="⏸" ToolTip="Pause all" Checked="OnPauseToggleChanged" Unchecked="OnPauseToggleChanged" />
                         <ToggleButton x:Name="MicToggle" Style="{StaticResource ControlToggleStyle}" Content="Mic" Checked="OnCaptureToggleChanged" Unchecked="OnCaptureToggleChanged" />
                         <ToggleButton x:Name="SystemToggle" Style="{StaticResource ControlToggleStyle}" Content="System" Checked="OnCaptureToggleChanged" Unchecked="OnCaptureToggleChanged" />
                         <ToggleButton x:Name="ScreenToggle" Style="{StaticResource ControlToggleStyle}" Content="Screen" Checked="OnCaptureToggleChanged" Unchecked="OnCaptureToggleChanged" />
+                        <Button x:Name="ScreenSourceButton" Style="{StaticResource ControlButtonStyle}" Content="⚙" Width="34" Padding="0" Click="OnOpenScreenSourceSettings" ToolTip="Screen source settings" />
                         <ToggleButton x:Name="TopmostToggle" Style="{StaticResource ControlToggleStyle}" Content="Pin Top" Checked="OnPinTopToggleChanged" Unchecked="OnPinTopToggleChanged" />
                         <Button Style="{StaticResource ControlButtonStyle}" Content="Loadouts" Click="OnOpenSettings" />
                         <Button Style="{StaticResource ControlButtonStyle}" Content="Clear Chips" Click="OnClearChips" />

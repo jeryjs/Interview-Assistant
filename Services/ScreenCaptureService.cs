@@ -16,10 +16,23 @@ public sealed class ScreenCaptureService : IDisposable
     private CancellationTokenSource? _captureCts;
     private Task? _captureTask;
     private bool _enabled;
+    private ScreenSourceMode _sourceMode = ScreenSourceMode.EntireScreen;
+    private long _sourceWindowHandle;
+    private string _sourceWindowTitle = string.Empty;
 
     private double[]? _lastHistogram;
 
     public event Action<string>? StatusChanged;
+
+    public void SetSource(ScreenSourceMode mode, long windowHandle, string windowTitle)
+    {
+        lock (_syncLock)
+        {
+            _sourceMode = mode;
+            _sourceWindowHandle = mode == ScreenSourceMode.SpecificWindow ? windowHandle : 0;
+            _sourceWindowTitle = mode == ScreenSourceMode.SpecificWindow ? windowTitle : string.Empty;
+        }
+    }
 
     public void SetEnabled(bool enabled)
     {
@@ -81,12 +94,38 @@ public sealed class ScreenCaptureService : IDisposable
 
     private FrameSnapshot CaptureFrame()
     {
+        ScreenSourceMode sourceMode;
+        long sourceWindowHandle;
+        string sourceWindowTitle;
+
+        lock (_syncLock)
+        {
+            sourceMode = _sourceMode;
+            sourceWindowHandle = _sourceWindowHandle;
+            sourceWindowTitle = _sourceWindowTitle;
+        }
+
+        var left = 0;
+        var top = 0;
         var width = (int)Math.Max(320, SystemParameters.PrimaryScreenWidth);
         var height = (int)Math.Max(180, SystemParameters.PrimaryScreenHeight);
 
+        if (sourceMode == ScreenSourceMode.SpecificWindow)
+        {
+            if (!WindowCatalogService.TryGetWindowBounds(sourceWindowHandle, out var bounds))
+            {
+                throw new InvalidOperationException("Selected screen-share window is no longer available.");
+            }
+
+            left = bounds.Left;
+            top = bounds.Top;
+            width = Math.Max(200, bounds.Width);
+            height = Math.Max(120, bounds.Height);
+        }
+
         using var bitmap = new Bitmap(width, height, PixelFormat.Format24bppRgb);
         using var graphics = Graphics.FromImage(bitmap);
-        graphics.CopyFromScreen(0, 0, 0, 0, bitmap.Size, CopyPixelOperation.SourceCopy);
+        graphics.CopyFromScreen(left, top, 0, 0, bitmap.Size, CopyPixelOperation.SourceCopy);
 
         using var resized = new Bitmap(640, 360, PixelFormat.Format24bppRgb);
         using (var resizedGraphics = Graphics.FromImage(resized))
@@ -106,7 +145,9 @@ public sealed class ScreenCaptureService : IDisposable
             Timestamp = DateTimeOffset.UtcNow,
             JpegBytes = jpegBytes,
             ChangeScore = delta,
-            Summary = "screen-keyframe",
+            Summary = sourceMode == ScreenSourceMode.SpecificWindow
+                ? $"window-keyframe ({sourceWindowTitle})"
+                : "screen-keyframe",
         };
     }
 

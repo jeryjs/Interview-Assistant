@@ -82,6 +82,13 @@ public partial class MainWindow : Window
     {
         _suppressToggleHandlers = true;
         _state.Normalize();
+        if (!_state.MicEnabled && !_state.SystemAudioEnabled && !_state.ScreenShareEnabled)
+        {
+            _state.IsPaused = true;
+        }
+
+        PauseToggle.IsChecked = _state.IsPaused;
+        UpdatePauseUi(_state.IsPaused);
         MicToggle.IsChecked = _state.MicEnabled;
         SystemToggle.IsChecked = _state.SystemAudioEnabled;
         ScreenToggle.IsChecked = _state.ScreenShareEnabled;
@@ -89,6 +96,7 @@ public partial class MainWindow : Window
         Topmost = _state.PinOnTop;
         TranscriptExpander.IsExpanded = _state.TranscriptExpanded;
 
+        ApplyScreenSourceToEngine();
         _assistantEngine.SetCaptureState(_state.MicEnabled, _state.SystemAudioEnabled, _state.ScreenShareEnabled);
         _chipFeed.Clear();
         foreach (var chip in _state.ChipFeed)
@@ -127,9 +135,119 @@ public partial class MainWindow : Window
         _state.MicEnabled = MicToggle.IsChecked == true;
         _state.SystemAudioEnabled = SystemToggle.IsChecked == true;
         _state.ScreenShareEnabled = ScreenToggle.IsChecked == true;
+
+        if (_state.ScreenShareEnabled && !HasValidConfiguredScreenSource())
+        {
+            _state.ScreenShareEnabled = false;
+            _suppressToggleHandlers = true;
+            ScreenToggle.IsChecked = false;
+            _suppressToggleHandlers = false;
+            SetStatus("Selected screen source is unavailable. Use the cog to choose another source.");
+        }
+
         _assistantEngine.SetCaptureState(_state.MicEnabled, _state.SystemAudioEnabled, _state.ScreenShareEnabled);
+
+        var allCaptureDisabled = !_state.MicEnabled && !_state.SystemAudioEnabled && !_state.ScreenShareEnabled;
+        if (allCaptureDisabled)
+        {
+            await SetPausedStateAsync(true, "All capture inputs disabled — paused");
+            return;
+        }
+
+        if (_state.IsPaused)
+        {
+            await SetPausedStateAsync(false, "Capture input re-enabled — resumed");
+            return;
+        }
+
         await AppStateStore.SaveAsync(_state);
         SetStatus("Capture state updated");
+    }
+
+    private async void OnPauseToggleChanged(object sender, RoutedEventArgs e)
+    {
+        if (_suppressToggleHandlers)
+        {
+            return;
+        }
+
+        await SetPausedStateAsync(PauseToggle.IsChecked == true, PauseToggle.IsChecked == true ? "Paused all activity" : "Resumed all activity");
+    }
+
+    private async Task SetPausedStateAsync(bool paused, string statusMessage)
+    {
+        if (_state.IsPaused == paused)
+        {
+            await AppStateStore.SaveAsync(_state);
+            SetStatus(statusMessage);
+            return;
+        }
+
+        _state.IsPaused = paused;
+        _suppressToggleHandlers = true;
+        PauseToggle.IsChecked = paused;
+        _suppressToggleHandlers = false;
+
+        UpdatePauseUi(paused);
+        _assistantEngine.SetPaused(paused);
+
+        if (paused)
+        {
+            _threadCts?.Cancel();
+            if (_threadWindow is not null)
+            {
+                _threadWindow.Close();
+                _threadWindow = null;
+            }
+        }
+
+        await AppStateStore.SaveAsync(_state);
+        SetStatus(statusMessage);
+    }
+
+    private void UpdatePauseUi(bool isPaused)
+    {
+        PauseToggle.Content = isPaused ? "▶" : "⏸";
+        PauseToggle.ToolTip = isPaused ? "Resume all" : "Pause all";
+    }
+
+    private void ApplyScreenSourceToEngine()
+    {
+        var mode = ResolveScreenSourceMode();
+        _assistantEngine.SetScreenSource(mode, _state.ScreenSourceWindowHandle, _state.ScreenSourceWindowTitle);
+        UpdateScreenSourceTooltip(mode);
+    }
+
+    private ScreenSourceMode ResolveScreenSourceMode()
+    {
+        return string.Equals(_state.ScreenSourceMode, "SpecificWindow", StringComparison.Ordinal)
+            ? ScreenSourceMode.SpecificWindow
+            : ScreenSourceMode.EntireScreen;
+    }
+
+    private bool HasValidConfiguredScreenSource()
+    {
+        var mode = ResolveScreenSourceMode();
+        if (mode == ScreenSourceMode.EntireScreen)
+        {
+            return true;
+        }
+
+        return WindowCatalogService.IsWindowValid(_state.ScreenSourceWindowHandle);
+    }
+
+    private void UpdateScreenSourceTooltip(ScreenSourceMode mode)
+    {
+        if (mode == ScreenSourceMode.EntireScreen)
+        {
+            ScreenSourceButton.ToolTip = "Screen source: Entire screen";
+            return;
+        }
+
+        var label = string.IsNullOrWhiteSpace(_state.ScreenSourceWindowTitle)
+            ? "Specific window"
+            : _state.ScreenSourceWindowTitle;
+        ScreenSourceButton.ToolTip = $"Screen source: {label}";
     }
 
     private async void OnOpenSettings(object sender, RoutedEventArgs e)
@@ -151,6 +269,43 @@ public partial class MainWindow : Window
         await AppStateStore.SaveAsync(_state);
         ApplyStateToUi();
         SetStatus("Provider settings saved");
+    }
+
+    private async void OnOpenScreenSourceSettings(object sender, RoutedEventArgs e)
+    {
+        var dialog = new ScreenSourceDialog(ResolveScreenSourceMode(), _state.ScreenSourceWindowHandle)
+        {
+            Owner = this,
+        };
+
+        if (dialog.ShowDialog() != true)
+        {
+            return;
+        }
+
+        _state.ScreenSourceMode = dialog.ResultMode == ScreenSourceMode.SpecificWindow
+            ? "SpecificWindow"
+            : "EntireScreen";
+        _state.ScreenSourceWindowHandle = dialog.ResultWindowHandle;
+        _state.ScreenSourceWindowTitle = dialog.ResultWindowTitle;
+
+        ApplyScreenSourceToEngine();
+
+        if (_state.ScreenShareEnabled && !HasValidConfiguredScreenSource())
+        {
+            _state.ScreenShareEnabled = false;
+            _suppressToggleHandlers = true;
+            ScreenToggle.IsChecked = false;
+            _suppressToggleHandlers = false;
+            _assistantEngine.SetCaptureState(_state.MicEnabled, _state.SystemAudioEnabled, _state.ScreenShareEnabled);
+            await AppStateStore.SaveAsync(_state);
+            SetStatus("Selected window is not currently available. Screen share turned off.");
+            return;
+        }
+
+        _assistantEngine.SetCaptureState(_state.MicEnabled, _state.SystemAudioEnabled, _state.ScreenShareEnabled);
+        await AppStateStore.SaveAsync(_state);
+        SetStatus("Screen source updated");
     }
 
     private async void OnClearChips(object sender, RoutedEventArgs e)

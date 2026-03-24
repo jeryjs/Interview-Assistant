@@ -28,6 +28,8 @@ public sealed class AssistantEngine : IDisposable
     private DateTimeOffset _lastRecommendationAt = DateTimeOffset.MinValue;
 
     private bool _started;
+    private bool _runtimeActive;
+    private bool _isPaused;
     private bool _micEnabled;
     private bool _systemAudioEnabled;
     private bool _screenEnabled;
@@ -39,9 +41,12 @@ public sealed class AssistantEngine : IDisposable
     public AssistantEngine(AppState state)
     {
         _state = state;
+        _isPaused = state.IsPaused;
         _micEnabled = state.MicEnabled;
         _systemAudioEnabled = state.SystemAudioEnabled;
         _screenEnabled = state.ScreenShareEnabled;
+
+        _screenCapture.SetSource(ResolveScreenSourceMode(state.ScreenSourceMode), state.ScreenSourceWindowHandle, state.ScreenSourceWindowTitle);
 
         _audioCapture.ChunkReady += OnAudioChunkReady;
         _audioCapture.SpeechDetected += OnSpeechDetected;
@@ -58,12 +63,14 @@ public sealed class AssistantEngine : IDisposable
         }
 
         _started = true;
-        _runCts = new CancellationTokenSource();
-        _audioCapture.SetEnabled(_micEnabled, _systemAudioEnabled);
-        _screenCapture.SetEnabled(_screenEnabled);
 
-        _transcriptionLoopTask = Task.Run(() => RunTranscriptionLoopAsync(_runCts.Token));
-        _recommendationLoopTask = Task.Run(() => RunRecommendationLoopAsync(_runCts.Token));
+        if (_isPaused)
+        {
+            StatusChanged?.Invoke("Assistant paused");
+            return;
+        }
+
+        StartRuntime();
         StatusChanged?.Invoke("Assistant engine started");
     }
 
@@ -73,8 +80,115 @@ public sealed class AssistantEngine : IDisposable
         _systemAudioEnabled = systemAudioEnabled;
         _screenEnabled = screenEnabled;
 
+        if (_runtimeActive && !_isPaused)
+        {
+            _audioCapture.SetEnabled(_micEnabled, _systemAudioEnabled);
+            _screenCapture.SetEnabled(_screenEnabled);
+            return;
+        }
+
+        _audioCapture.SetEnabled(false, false);
+        _screenCapture.SetEnabled(false);
+    }
+
+    public void SetScreenSource(ScreenSourceMode mode, long windowHandle, string windowTitle)
+    {
+        _state.ScreenSourceMode = mode == ScreenSourceMode.SpecificWindow ? "SpecificWindow" : "EntireScreen";
+        _state.ScreenSourceWindowHandle = mode == ScreenSourceMode.SpecificWindow ? windowHandle : 0;
+        _state.ScreenSourceWindowTitle = mode == ScreenSourceMode.SpecificWindow ? windowTitle : string.Empty;
+        _screenCapture.SetSource(mode, windowHandle, windowTitle);
+    }
+
+    private static ScreenSourceMode ResolveScreenSourceMode(string value)
+    {
+        return string.Equals(value, "SpecificWindow", StringComparison.Ordinal)
+            ? ScreenSourceMode.SpecificWindow
+            : ScreenSourceMode.EntireScreen;
+    }
+
+    public bool IsPaused()
+    {
+        return _isPaused;
+    }
+
+    public void SetPaused(bool paused)
+    {
+        if (_isPaused == paused)
+        {
+            return;
+        }
+
+        _isPaused = paused;
+        _state.IsPaused = paused;
+
+        if (_isPaused)
+        {
+            StopRuntime();
+            DrainPendingAudioChunks();
+            StatusChanged?.Invoke("Assistant paused");
+            return;
+        }
+
+        if (_started)
+        {
+            StartRuntime();
+            StatusChanged?.Invoke("Assistant resumed");
+        }
+    }
+
+    private void StartRuntime()
+    {
+        if (_runtimeActive)
+        {
+            return;
+        }
+
+        _runCts = new CancellationTokenSource();
         _audioCapture.SetEnabled(_micEnabled, _systemAudioEnabled);
         _screenCapture.SetEnabled(_screenEnabled);
+        _transcriptionLoopTask = Task.Run(() => RunTranscriptionLoopAsync(_runCts.Token));
+        _recommendationLoopTask = Task.Run(() => RunRecommendationLoopAsync(_runCts.Token));
+        _runtimeActive = true;
+    }
+
+    private void StopRuntime()
+    {
+        if (!_runtimeActive)
+        {
+            return;
+        }
+
+        var cts = _runCts;
+        if (cts is not null && !cts.IsCancellationRequested)
+        {
+            cts.Cancel();
+        }
+
+        _audioCapture.SetEnabled(false, false);
+        _screenCapture.SetEnabled(false);
+
+        try
+        {
+            _transcriptionLoopTask?.Wait(TimeSpan.FromSeconds(2));
+            _recommendationLoopTask?.Wait(TimeSpan.FromSeconds(2));
+        }
+        catch
+        {
+            // ignored
+        }
+
+        _transcriptionLoopTask = null;
+        _recommendationLoopTask = null;
+        cts?.Dispose();
+        _runCts = null;
+        _runtimeActive = false;
+    }
+
+    private void DrainPendingAudioChunks()
+    {
+        while (_audioChunks.Reader.TryRead(out _))
+        {
+        }
     }
 
     private void OnAudioChunkReady(AudioCaptureService.AudioChunk chunk)
@@ -338,23 +452,12 @@ public sealed class AssistantEngine : IDisposable
 
     public void Dispose()
     {
-        _runCts?.Cancel();
+        StopRuntime();
         _audioChunks.Writer.TryComplete();
-
-        try
-        {
-            _transcriptionLoopTask?.Wait(TimeSpan.FromSeconds(2));
-            _recommendationLoopTask?.Wait(TimeSpan.FromSeconds(2));
-        }
-        catch
-        {
-            // ignored
-        }
 
         _audioCapture.Dispose();
         _screenCapture.Dispose();
         _whisperTranscriber.Dispose();
         _recommendationLock.Dispose();
-        _runCts?.Dispose();
     }
 }

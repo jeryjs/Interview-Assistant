@@ -48,9 +48,13 @@ public static class AppStateStore
 
         var toPersist = new AppState
         {
+            IsPaused = state.IsPaused,
             MicEnabled = state.MicEnabled,
             SystemAudioEnabled = state.SystemAudioEnabled,
             ScreenShareEnabled = state.ScreenShareEnabled,
+            ScreenSourceMode = state.ScreenSourceMode,
+            ScreenSourceWindowHandle = state.ScreenSourceWindowHandle,
+            ScreenSourceWindowTitle = state.ScreenSourceWindowTitle,
             PinOnTop = state.PinOnTop,
             TranscriptExpanded = state.TranscriptExpanded,
             WhisperModelPath = state.WhisperModelPath,

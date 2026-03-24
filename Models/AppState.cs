@@ -2,9 +2,13 @@ namespace Naveen_Sir.Models;
 
 public sealed class AppState
 {
+    public bool IsPaused { get; set; }
     public bool MicEnabled { get; set; } = true;
     public bool SystemAudioEnabled { get; set; } = true;
     public bool ScreenShareEnabled { get; set; } = true;
+    public string ScreenSourceMode { get; set; } = "EntireScreen";
+    public long ScreenSourceWindowHandle { get; set; }
+    public string ScreenSourceWindowTitle { get; set; } = string.Empty;
     public bool PinOnTop { get; set; }
     public bool TranscriptExpanded { get; set; } = false;
     public string WhisperModelPath { get; set; } = string.Empty;
@@ -30,6 +34,20 @@ public sealed class AppState
         if (MaxChipCount < 50)
         {
             MaxChipCount = 220;
+        }
+
+        if (!string.Equals(ScreenSourceMode, "EntireScreen", StringComparison.Ordinal)
+            && !string.Equals(ScreenSourceMode, "SpecificWindow", StringComparison.Ordinal))
+        {
+            ScreenSourceMode = "EntireScreen";
+            ScreenSourceWindowHandle = 0;
+            ScreenSourceWindowTitle = string.Empty;
+        }
+
+        if (string.Equals(ScreenSourceMode, "EntireScreen", StringComparison.Ordinal))
+        {
+            ScreenSourceWindowHandle = 0;
+            ScreenSourceWindowTitle = string.Empty;
         }
 
         var now = DateTime.UtcNow;
