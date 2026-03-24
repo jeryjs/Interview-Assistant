@@ -159,6 +159,7 @@
                                     ValueChanged="OnContextWindowValueChanged" />
                         </StackPanel>
                         <ToggleButton x:Name="PauseToggle" Style="{StaticResource ControlToggleStyle}" Content="⏸" ToolTip="Pause all" Checked="OnPauseToggleChanged" Unchecked="OnPauseToggleChanged" />
+                        <ToggleButton x:Name="TranscriptVisibilityToggle" Style="{StaticResource ControlToggleStyle}" Content="Tx" ToolTip="Show transcript events" Checked="OnTranscriptVisibilityToggleChanged" Unchecked="OnTranscriptVisibilityToggleChanged" />
                         <ToggleButton x:Name="MicToggle" Style="{StaticResource ControlToggleStyle}" Content="Mic" Checked="OnCaptureToggleChanged" Unchecked="OnCaptureToggleChanged" />
                         <ToggleButton x:Name="SystemToggle" Style="{StaticResource ControlToggleStyle}" Content="System" Checked="OnCaptureToggleChanged" Unchecked="OnCaptureToggleChanged" />
                         <ToggleButton x:Name="ScreenToggle" Style="{StaticResource ControlToggleStyle}" Content="Screen" Checked="OnCaptureToggleChanged" Unchecked="OnCaptureToggleChanged" />
@@ -189,7 +190,7 @@
                                 <ColumnDefinition Width="220" />
                             </Grid.ColumnDefinitions>
 
-                            <TextBlock Text="Recommendations"
+                            <TextBlock Text="Live feed"
                                        Foreground="{DynamicResource PrimaryTextBrush}"
                                        FontSize="18"
                                        FontWeight="SemiBold"
@@ -218,44 +219,49 @@
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate>
                                         <Border Margin="0,0,0,10"
-                                                Padding="8"
+                                                Padding="8,6"
                                                 CornerRadius="10"
                                                 Background="#7A111A27"
                                                 BorderBrush="#2F4562"
                                                 BorderThickness="1">
-                                            <StackPanel>
-                                                <TextBlock Text="{Binding HeaderText}"
-                                                           Foreground="{DynamicResource SecondaryTextBrush}"
-                                                           FontSize="11"
-                                                           FontWeight="SemiBold"
-                                                           Margin="0,0,0,4" />
-                                                <TextBlock Text="{Binding Message}"
-                                                           Foreground="{DynamicResource PrimaryTextBrush}"
-                                                           TextWrapping="Wrap"
-                                                           Margin="0,0,0,6" />
-                                                <ItemsControl ItemsSource="{Binding Chips}">
-                                                    <ItemsControl.ItemsPanel>
-                                                        <ItemsPanelTemplate>
-                                                            <WrapPanel />
-                                                        </ItemsPanelTemplate>
-                                                    </ItemsControl.ItemsPanel>
-                                                    <ItemsControl.ItemTemplate>
-                                                        <DataTemplate>
-                                                            <Button Style="{StaticResource ChipButtonStyle}"
-                                                                    Content="{Binding Text}"
-                                                                    BorderBrush="{Binding BorderColor}"
-                                                                    Click="OnChipClick">
-                                                                <Button.Background>
-                                                                    <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
-                                                                        <GradientStop Color="{Binding GradientStartColor}" Offset="0" />
-                                                                        <GradientStop Color="{Binding GradientEndColor}" Offset="1" />
-                                                                    </LinearGradientBrush>
-                                                                </Button.Background>
-                                                            </Button>
-                                                        </DataTemplate>
-                                                    </ItemsControl.ItemTemplate>
-                                                </ItemsControl>
-                                            </StackPanel>
+                                            <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled">
+                                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                                    <TextBlock Text="{Binding TimeLabel}"
+                                                               Foreground="{DynamicResource SecondaryTextBrush}"
+                                                               FontSize="11"
+                                                               FontWeight="SemiBold"
+                                                               Margin="0,0,8,0"
+                                                               VerticalAlignment="Center" />
+                                                    <TextBlock Text="{Binding Message}"
+                                                               Foreground="{DynamicResource PrimaryTextBrush}"
+                                                               TextTrimming="CharacterEllipsis"
+                                                               Margin="0,0,8,0"
+                                                               VerticalAlignment="Center" />
+                                                    <ItemsControl ItemsSource="{Binding Chips}">
+                                                        <ItemsControl.ItemsPanel>
+                                                            <ItemsPanelTemplate>
+                                                                <StackPanel Orientation="Horizontal" />
+                                                            </ItemsPanelTemplate>
+                                                        </ItemsControl.ItemsPanel>
+                                                        <ItemsControl.ItemTemplate>
+                                                            <DataTemplate>
+                                                                <Button Style="{StaticResource ChipButtonStyle}"
+                                                                        Content="{Binding Text}"
+                                                                        BorderBrush="{Binding BorderColor}"
+                                                                        Margin="0,0,8,0"
+                                                                        Click="OnChipClick">
+                                                                    <Button.Background>
+                                                                        <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                                                                            <GradientStop Color="{Binding GradientStartColor}" Offset="0" />
+                                                                            <GradientStop Color="{Binding GradientEndColor}" Offset="1" />
+                                                                        </LinearGradientBrush>
+                                                                    </Button.Background>
+                                                                </Button>
+                                                            </DataTemplate>
+                                                        </ItemsControl.ItemTemplate>
+                                                    </ItemsControl>
+                                                </StackPanel>
+                                            </ScrollViewer>
                                         </Border>
                                     </DataTemplate>
                                 </ItemsControl.ItemTemplate>

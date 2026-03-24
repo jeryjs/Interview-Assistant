@@ -3,6 +3,7 @@ namespace Naveen_Sir.Models;
 public sealed class AppState
 {
     public bool IsPaused { get; set; }
+    public bool ShowTranscriptEvents { get; set; } = true;
     public bool MicEnabled { get; set; } = true;
     public bool SystemAudioEnabled { get; set; } = true;
     public bool ScreenShareEnabled { get; set; } = true;

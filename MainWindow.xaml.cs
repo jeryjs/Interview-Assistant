@@ -21,12 +21,14 @@ public partial class MainWindow : Window
     private readonly ObservableCollection<UiLogEntry> _logs = [];
     private readonly ObservableCollection<string> _quickModelOptions = [];
     private readonly ICollectionView _timelineView;
+    private readonly List<string> _pendingTranscriptLines = [];
 
     private readonly AppState _state;
     private readonly AssistantEngine _assistantEngine;
 
     private CancellationTokenSource? _threadCts;
     private ThreadWindow? _threadWindow;
+    private RecommendationEvent? _activeTranscriptEvent;
     private bool _suppressToggleHandlers;
     private bool _suppressModelEvents;
     private bool _suppressContextWindowEvents;
@@ -79,7 +81,36 @@ public partial class MainWindow : Window
 
     private void OnTranscriptGenerated(string line)
     {
-        AddTimelineEvent("Transcript", line, []);
+        if (!_state.ShowTranscriptEvents)
+        {
+            return;
+        }
+
+        _pendingTranscriptLines.Add(line);
+        if (_pendingTranscriptLines.Count > 12)
+        {
+            _pendingTranscriptLines.RemoveAt(0);
+        }
+
+        var mergedMessage = string.Join("  •  ", _pendingTranscriptLines);
+        if (_activeTranscriptEvent is null)
+        {
+            _activeTranscriptEvent = new RecommendationEvent
+            {
+                Kind = "Transcript",
+                Message = mergedMessage,
+                CreatedAt = DateTime.Now,
+                Chips = [],
+            };
+            _timelineEvents.Insert(0, _activeTranscriptEvent);
+        }
+        else
+        {
+            _activeTranscriptEvent.CreatedAt = DateTime.Now;
+            _activeTranscriptEvent.Message = mergedMessage;
+        }
+
+        _timelineView.Refresh();
     }
 
     private void OnChipsGenerated(IReadOnlyList<ChipItem> chips)
@@ -103,6 +134,8 @@ public partial class MainWindow : Window
         if (newBatch.Count > 0)
         {
             AddTimelineEvent("Recommendations", $"{newBatch.Count} new chips", newBatch);
+            _pendingTranscriptLines.Clear();
+            _activeTranscriptEvent = null;
         }
 
         SetStatus($"Updated chips at {DateTime.Now:HH:mm:ss}");
@@ -119,6 +152,7 @@ public partial class MainWindow : Window
 
         PauseToggle.IsChecked = _state.IsPaused;
         UpdatePauseUi(_state.IsPaused);
+        TranscriptVisibilityToggle.IsChecked = _state.ShowTranscriptEvents;
         MicToggle.IsChecked = _state.MicEnabled;
         SystemToggle.IsChecked = _state.SystemAudioEnabled;
         ScreenToggle.IsChecked = _state.ScreenShareEnabled;
@@ -466,6 +500,8 @@ public partial class MainWindow : Window
     private void RebuildTimelineFromChipHistory()
     {
         _timelineEvents.Clear();
+        _pendingTranscriptLines.Clear();
+        _activeTranscriptEvent = null;
 
         var groups = _chipFeed
             .OrderByDescending(chip => chip.CreatedAtUtc)
@@ -488,6 +524,34 @@ public partial class MainWindow : Window
         }
 
         _timelineView.Refresh();
+    }
+
+    private async void OnTranscriptVisibilityToggleChanged(object sender, RoutedEventArgs e)
+    {
+        if (_suppressToggleHandlers)
+        {
+            return;
+        }
+
+        _state.ShowTranscriptEvents = TranscriptVisibilityToggle.IsChecked == true;
+        if (!_state.ShowTranscriptEvents)
+        {
+            _pendingTranscriptLines.Clear();
+            _activeTranscriptEvent = null;
+
+            var transcriptEvents = _timelineEvents
+                .Where(evt => evt.IsTranscript)
+                .ToList();
+            foreach (var transcriptEvent in transcriptEvents)
+            {
+                _timelineEvents.Remove(transcriptEvent);
+            }
+
+            _timelineView.Refresh();
+        }
+
+        await AppStateStore.SaveAsync(_state);
+        SetStatus(_state.ShowTranscriptEvents ? "Transcript events enabled" : "Transcript events hidden");
     }
 
     private void UpdateContextWindowLabel()

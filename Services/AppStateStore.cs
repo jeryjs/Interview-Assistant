@@ -49,6 +49,7 @@ public static class AppStateStore
         var toPersist = new AppState
         {
             IsPaused = state.IsPaused,
+            ShowTranscriptEvents = state.ShowTranscriptEvents,
             MicEnabled = state.MicEnabled,
             SystemAudioEnabled = state.SystemAudioEnabled,
             ScreenShareEnabled = state.ScreenShareEnabled,
