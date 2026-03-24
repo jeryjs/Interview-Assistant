@@ -17,6 +17,7 @@ public sealed class OpenAiCompatibleClient
 
     public async IAsyncEnumerable<string> StreamRecommendationTextAsync(
         ProviderLoadout loadout,
+        string modelId,
         string transcriptContext,
         IReadOnlyList<FrameSnapshot> keyframes,
         IReadOnlyList<string> existingChips,
@@ -28,7 +29,7 @@ public sealed class OpenAiCompatibleClient
 
         var payload = new
         {
-            model = loadout.ModelId,
+            model = string.IsNullOrWhiteSpace(modelId) ? loadout.ModelId : modelId,
             stream = true,
             temperature = loadout.Temperature,
             max_tokens = Math.Max(200, loadout.MaxTokens),
@@ -55,6 +56,7 @@ public sealed class OpenAiCompatibleClient
 
     public async IAsyncEnumerable<string> StreamTopicMarkdownAsync(
         ProviderLoadout loadout,
+        string modelId,
         string topic,
         string transcriptContext,
         [EnumeratorCancellation] CancellationToken cancellationToken)
@@ -65,7 +67,7 @@ public sealed class OpenAiCompatibleClient
 
         var payload = new
         {
-            model = loadout.ModelId,
+            model = string.IsNullOrWhiteSpace(modelId) ? loadout.ModelId : modelId,
             stream = true,
             // We wont be passing these as not all endpoints support them, and the defaults are usually good enough for this use case
             // temperature = Math.Min(0.6f, Math.Max(0.15f, loadout.Temperature)),

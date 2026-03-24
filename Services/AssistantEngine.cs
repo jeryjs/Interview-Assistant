@@ -335,6 +335,7 @@ public sealed class AssistantEngine : IDisposable
         }
 
         var loadout = _state.ResolveActiveLoadout();
+        var chipModelId = loadout.ResolveChipModelId();
         var frames = _screenEnabled
             ? _screenCapture.GetTopKeyframes(TimeSpan.FromSeconds(30), 10)
             : [];
@@ -342,18 +343,18 @@ public sealed class AssistantEngine : IDisposable
         StatusChanged?.Invoke($"Sending context to provider: {frames.Count} keyframes, {currentChips.Count} chips");
 
         var streamBuffer = new StringBuilder();
-        await foreach (var chunk in _providerClient.StreamRecommendationTextAsync(loadout, transcriptContext, frames, currentChips, cancellationToken))
+        await foreach (var chunk in _providerClient.StreamRecommendationTextAsync(loadout, chipModelId, transcriptContext, frames, currentChips, cancellationToken))
         {
             streamBuffer.Append(chunk);
             foreach (var chip in DrainChipsFromBuffer(streamBuffer))
             {
-                EmitChip(chip, loadout);
+                EmitChip(chip, loadout, chipModelId);
             }
         }
 
         foreach (var chip in ParseChips(streamBuffer.ToString()))
         {
-            EmitChip(chip, loadout);
+            EmitChip(chip, loadout, chipModelId);
         }
     }
 
@@ -400,7 +401,7 @@ public sealed class AssistantEngine : IDisposable
         return normalized;
     }
 
-    private void EmitChip(string chipText, ProviderLoadout loadout)
+    private void EmitChip(string chipText, ProviderLoadout loadout, string chipModelId)
     {
         if (string.IsNullOrWhiteSpace(chipText) || chipText.Length < 3)
         {
@@ -421,14 +422,19 @@ public sealed class AssistantEngine : IDisposable
             }
         }
 
+        var palette = ChipColorService.ForText(chipText);
+
         ChipsGenerated?.Invoke([
             new ChipItem
             {
                 Id = Guid.NewGuid().ToString("N"),
                 Text = chipText,
                 CreatedAtUtc = DateTime.UtcNow,
-                SourceModel = loadout.ModelId,
+                SourceModel = chipModelId,
                 SourceProviderName = loadout.Name,
+                BorderColor = palette.BorderHex,
+                GradientStartColor = palette.GradientStartHex,
+                GradientEndColor = palette.GradientEndHex,
             },
         ]);
     }
@@ -454,7 +460,8 @@ public sealed class AssistantEngine : IDisposable
             transcriptContext = "No recent transcript context available.";
         }
 
-        await foreach (var chunk in _providerClient.StreamTopicMarkdownAsync(loadout, topic, transcriptContext, cancellationToken).WithCancellation(cancellationToken))
+        var topicModelId = loadout.ResolveTopicModelId();
+        await foreach (var chunk in _providerClient.StreamTopicMarkdownAsync(loadout, topicModelId, topic, transcriptContext, cancellationToken).WithCancellation(cancellationToken))
         {
             yield return chunk;
         }

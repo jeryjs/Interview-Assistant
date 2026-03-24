@@ -129,6 +129,20 @@
                                Margin="0,0,12,0" />
 
                     <WrapPanel Grid.Column="1" VerticalAlignment="Center">
+                        <ComboBox x:Name="ChipModelCombo"
+                                  Width="140"
+                                  Margin="0,0,8,0"
+                                  IsEditable="True"
+                                  ToolTip="Quick chip model"
+                                  SelectionChanged="OnQuickModelSelectionChanged"
+                                  LostKeyboardFocus="OnQuickModelCommit" />
+                        <ComboBox x:Name="TopicModelCombo"
+                                  Width="140"
+                                  Margin="0,0,8,0"
+                                  IsEditable="True"
+                                  ToolTip="Quick topic model"
+                                  SelectionChanged="OnQuickModelSelectionChanged"
+                                  LostKeyboardFocus="OnQuickModelCommit" />
                         <ToggleButton x:Name="PauseToggle" Style="{StaticResource ControlToggleStyle}" Content="⏸" ToolTip="Pause all" Checked="OnPauseToggleChanged" Unchecked="OnPauseToggleChanged" />
                         <ToggleButton x:Name="MicToggle" Style="{StaticResource ControlToggleStyle}" Content="Mic" Checked="OnCaptureToggleChanged" Unchecked="OnCaptureToggleChanged" />
                         <ToggleButton x:Name="SystemToggle" Style="{StaticResource ControlToggleStyle}" Content="System" Checked="OnCaptureToggleChanged" Unchecked="OnCaptureToggleChanged" />
@@ -154,11 +168,30 @@
                             <RowDefinition Height="*" />
                         </Grid.RowDefinitions>
 
-                        <TextBlock Text="Recommendations"
-                                   Foreground="{DynamicResource PrimaryTextBrush}"
-                                   FontSize="18"
-                                   FontWeight="SemiBold"
-                                   Margin="0,0,0,12" />
+                        <Grid Margin="0,0,0,12">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="220" />
+                            </Grid.ColumnDefinitions>
+
+                            <TextBlock Text="Recommendations"
+                                       Foreground="{DynamicResource PrimaryTextBrush}"
+                                       FontSize="18"
+                                       FontWeight="SemiBold"
+                                       VerticalAlignment="Center" />
+
+                            <TextBox x:Name="ChipSearchBox"
+                                     Grid.Column="1"
+                                     Height="30"
+                                     Margin="10,0,0,0"
+                                     Padding="8,4"
+                                     Background="#11243A"
+                                     Foreground="{DynamicResource PrimaryTextBrush}"
+                                     BorderBrush="{DynamicResource PanelBorderBrush}"
+                                     BorderThickness="1"
+                                     TextChanged="OnChipSearchChanged"
+                                     ToolTip="Filter chips" />
+                        </Grid>
 
                         <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
                             <ItemsControl x:Name="ChipItemsControl">
@@ -169,7 +202,17 @@
                                 </ItemsControl.ItemsPanel>
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate>
-                                        <Button Style="{StaticResource ChipButtonStyle}" Content="{Binding Text}" Click="OnChipClick" />
+                                        <Button Style="{StaticResource ChipButtonStyle}"
+                                                Content="{Binding Text}"
+                                                BorderBrush="{Binding BorderColor}"
+                                                Click="OnChipClick">
+                                            <Button.Background>
+                                                <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                                                    <GradientStop Color="{Binding GradientStartColor}" Offset="0" />
+                                                    <GradientStop Color="{Binding GradientEndColor}" Offset="1" />
+                                                </LinearGradientBrush>
+                                            </Button.Background>
+                                        </Button>
                                     </DataTemplate>
                                 </ItemsControl.ItemTemplate>
                             </ItemsControl>
@@ -200,6 +243,39 @@
                                  Foreground="{DynamicResource PrimaryTextBrush}"
                                  BorderBrush="{DynamicResource PanelBorderBrush}"
                                  BorderThickness="1" />
+                    </Expander>
+                </Border>
+
+                <Border HorizontalAlignment="Right"
+                        VerticalAlignment="Top"
+                        Width="360"
+                        Margin="0,272,16,0"
+                        Padding="8"
+                        CornerRadius="12"
+                        Background="#B0101622"
+                        BorderBrush="{DynamicResource PanelBorderBrush}"
+                        BorderThickness="1"
+                        Panel.ZIndex="11">
+                    <Expander x:Name="LogExpander"
+                              Foreground="{DynamicResource PrimaryTextBrush}"
+                              Header="Logs"
+                              IsExpanded="False">
+                        <ListBox x:Name="LogList"
+                                 Height="170"
+                                 Margin="0,8,0,0"
+                                 Background="#A00A111B"
+                                 Foreground="{DynamicResource PrimaryTextBrush}"
+                                 BorderBrush="{DynamicResource PanelBorderBrush}"
+                                 BorderThickness="1"
+                                 SelectionChanged="OnLogItemSelected">
+                            <ListBox.ItemTemplate>
+                                <DataTemplate>
+                                    <Border Padding="6" BorderThickness="0,0,0,1" BorderBrush="#33465F">
+                                        <TextBlock Text="{Binding DisplayText}" TextWrapping="Wrap" />
+                                    </Border>
+                                </DataTemplate>
+                            </ListBox.ItemTemplate>
+                        </ListBox>
                     </Expander>
                 </Border>
             </Grid>

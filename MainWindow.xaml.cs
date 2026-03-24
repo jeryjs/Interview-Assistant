@@ -3,6 +3,7 @@ using System.ComponentModel;
 using Microsoft.Win32;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Data;
 using System.Windows.Media;
 using System.Windows.Input;
 using Naveen_Sir.Models;
@@ -17,6 +18,9 @@ public partial class MainWindow : Window
 {
     private readonly ObservableCollection<string> _transcriptLines = [];
     private readonly ObservableCollection<ChipItem> _chipFeed = [];
+    private readonly ObservableCollection<UiLogEntry> _logs = [];
+    private readonly ObservableCollection<string> _quickModelOptions = [];
+    private readonly ICollectionView _chipView;
 
     private readonly AppState _state;
     private readonly AssistantEngine _assistantEngine;
@@ -24,15 +28,22 @@ public partial class MainWindow : Window
     private CancellationTokenSource? _threadCts;
     private ThreadWindow? _threadWindow;
     private bool _suppressToggleHandlers;
+    private bool _suppressModelEvents;
+    private string _chipSearchText = string.Empty;
 
     public MainWindow()
     {
         _state = AppStateStore.Load();
         _assistantEngine = new AssistantEngine(_state);
+        _chipView = CollectionViewSource.GetDefaultView(_chipFeed);
+        _chipView.Filter = FilterChip;
         InitializeComponent();
 
         TranscriptList.ItemsSource = _transcriptLines;
-        ChipItemsControl.ItemsSource = _chipFeed;
+        ChipItemsControl.ItemsSource = _chipView;
+        LogList.ItemsSource = _logs;
+        ChipModelCombo.ItemsSource = _quickModelOptions;
+        TopicModelCombo.ItemsSource = _quickModelOptions;
 
         ApplyTheme(ThemeService.IsDarkTheme());
         ApplyStateToUi();
@@ -81,6 +92,7 @@ public partial class MainWindow : Window
         var existing = _chipFeed.Select(static c => c.Text).ToHashSet(StringComparer.OrdinalIgnoreCase);
         foreach (var chip in chips.Where(chip => !existing.Contains(chip.Text)))
         {
+            EnsureChipPalette(chip);
             _chipFeed.Add(chip);
         }
 
@@ -91,6 +103,7 @@ public partial class MainWindow : Window
 
         _state.ChipFeed = _chipFeed.ToList();
         _ = AppStateStore.SaveAsync(_state);
+        _chipView.Refresh();
         SetStatus($"Updated chips at {DateTime.Now:HH:mm:ss}");
     }
 
@@ -113,12 +126,15 @@ public partial class MainWindow : Window
         TranscriptExpander.IsExpanded = _state.TranscriptExpanded;
 
         ApplyScreenSourceToEngine();
+        RefreshQuickModelUi();
         _assistantEngine.SetCaptureState(_state.MicEnabled, _state.SystemAudioEnabled, _state.ScreenShareEnabled);
         _chipFeed.Clear();
         foreach (var chip in _state.ChipFeed)
         {
+            EnsureChipPalette(chip);
             _chipFeed.Add(chip);
         }
+        _chipView.Refresh();
 
         var activeLoadout = _state.ResolveActiveLoadout();
         ProviderStatusText.Text = $"Provider: {activeLoadout.Name} · {activeLoadout.ModelId} · {activeLoadout.Endpoint}";
@@ -139,6 +155,54 @@ public partial class MainWindow : Window
 
         StatusText.Text = normalized;
         StatusText.ToolTip = message;
+        AppendLog(message);
+    }
+
+    private void AppendLog(string message)
+    {
+        if (string.IsNullOrWhiteSpace(message))
+        {
+            return;
+        }
+
+        var normalized = message.Replace('\r', ' ').Replace('\n', ' ').Trim();
+        if (_logs.Count > 0 && string.Equals(_logs[0].RawMessage, normalized, StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        _logs.Insert(0, new UiLogEntry(normalized));
+        const int maxLogCount = 220;
+        while (_logs.Count > maxLogCount)
+        {
+            _logs.RemoveAt(_logs.Count - 1);
+        }
+    }
+
+    private static void EnsureChipPalette(ChipItem chip)
+    {
+        if (!string.IsNullOrWhiteSpace(chip.BorderColor)
+            && !string.IsNullOrWhiteSpace(chip.GradientStartColor)
+            && !string.IsNullOrWhiteSpace(chip.GradientEndColor))
+        {
+            return;
+        }
+
+        var palette = ChipColorService.ForText(chip.Text);
+        chip.BorderColor = palette.BorderHex;
+        chip.GradientStartColor = palette.GradientStartHex;
+        chip.GradientEndColor = palette.GradientEndHex;
+    }
+
+    private void OnLogItemSelected(object sender, SelectionChangedEventArgs e)
+    {
+        if (LogList.SelectedItem is not UiLogEntry entry)
+        {
+            return;
+        }
+
+        entry.IsExpanded = !entry.IsExpanded;
+        LogList.SelectedItem = null;
     }
 
     private async void OnCaptureToggleChanged(object sender, RoutedEventArgs e)
@@ -285,6 +349,122 @@ public partial class MainWindow : Window
         await AppStateStore.SaveAsync(_state);
         ApplyStateToUi();
         SetStatus("Provider settings saved");
+    }
+
+    private void RefreshQuickModelUi()
+    {
+        _suppressModelEvents = true;
+
+        var activeLoadout = _state.ResolveActiveLoadout();
+        if (string.IsNullOrWhiteSpace(activeLoadout.ChipModelId))
+        {
+            activeLoadout.ChipModelId = activeLoadout.ModelId;
+        }
+
+        if (string.IsNullOrWhiteSpace(activeLoadout.TopicModelId))
+        {
+            activeLoadout.TopicModelId = activeLoadout.ModelId;
+        }
+
+        var options = _state.ProviderLoadouts
+            .SelectMany(loadout => new[]
+            {
+                loadout.ModelId,
+                loadout.ChipModelId,
+                loadout.TopicModelId,
+            })
+            .Where(model => !string.IsNullOrWhiteSpace(model))
+            .Select(model => model.Trim())
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .OrderBy(model => model, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        if (options.Count == 0)
+        {
+            options.Add("gpt-4o-mini");
+            options.Add("gpt-4.1-mini");
+            options.Add("gpt-4.1");
+        }
+
+        _quickModelOptions.Clear();
+        foreach (var option in options)
+        {
+            _quickModelOptions.Add(option);
+        }
+
+        ChipModelCombo.Text = activeLoadout.ResolveChipModelId();
+        TopicModelCombo.Text = activeLoadout.ResolveTopicModelId();
+        ChipModelCombo.ToolTip = $"Chip model: {activeLoadout.ResolveChipModelId()}";
+        TopicModelCombo.ToolTip = $"Topic model: {activeLoadout.ResolveTopicModelId()}";
+
+        _suppressModelEvents = false;
+    }
+
+    private async void OnQuickModelSelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        await ApplyQuickModelSelectionAsync(sender as ComboBox);
+    }
+
+    private void OnChipSearchChanged(object sender, TextChangedEventArgs e)
+    {
+        _chipSearchText = ChipSearchBox.Text?.Trim() ?? string.Empty;
+        _chipView.Refresh();
+    }
+
+    private bool FilterChip(object item)
+    {
+        if (item is not ChipItem chip)
+        {
+            return false;
+        }
+
+        if (string.IsNullOrWhiteSpace(_chipSearchText))
+        {
+            return true;
+        }
+
+        return chip.Text.Contains(_chipSearchText, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private async void OnQuickModelCommit(object sender, RoutedEventArgs e)
+    {
+        await ApplyQuickModelSelectionAsync(sender as ComboBox);
+    }
+
+    private async Task ApplyQuickModelSelectionAsync(ComboBox? combo)
+    {
+        if (_suppressModelEvents || combo is null)
+        {
+            return;
+        }
+
+        var selectedModel = combo.Text?.Trim() ?? string.Empty;
+        if (string.IsNullOrWhiteSpace(selectedModel))
+        {
+            return;
+        }
+
+        var activeLoadout = _state.ResolveActiveLoadout();
+        var isChipModel = ReferenceEquals(combo, ChipModelCombo);
+        if (isChipModel)
+        {
+            activeLoadout.ChipModelId = selectedModel;
+        }
+        else
+        {
+            activeLoadout.TopicModelId = selectedModel;
+        }
+
+        if (!_quickModelOptions.Any(existing => string.Equals(existing, selectedModel, StringComparison.OrdinalIgnoreCase)))
+        {
+            _quickModelOptions.Insert(0, selectedModel);
+        }
+
+        await AppStateStore.SaveAsync(_state);
+        SetStatus(isChipModel
+            ? $"Chip model set to {selectedModel}"
+            : $"Topic model set to {selectedModel}");
+        RefreshQuickModelUi();
     }
 
     private async void OnOpenScreenSourceSettings(object sender, RoutedEventArgs e)

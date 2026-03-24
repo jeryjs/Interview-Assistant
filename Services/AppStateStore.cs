@@ -71,6 +71,8 @@ public static class AppStateStore
                     Endpoint = loadout.Endpoint,
                     ApiKey = Encrypt(loadout.ApiKey),
                     ModelId = loadout.ModelId,
+                    ChipModelId = loadout.ChipModelId,
+                    TopicModelId = loadout.TopicModelId,
                     Temperature = loadout.Temperature,
                     MaxTokens = loadout.MaxTokens,
                 })
