@@ -66,8 +66,9 @@ public sealed class OpenAiCompatibleClient
         {
             model = loadout.ModelId,
             stream = true,
-            temperature = Math.Min(0.6f, Math.Max(0.15f, loadout.Temperature)),
-            max_tokens = Math.Max(700, loadout.MaxTokens * 3),
+            // We wont be passing these as not all endpoints support them, and the defaults are usually good enough for this use case
+            // temperature = Math.Min(0.6f, Math.Max(0.15f, loadout.Temperature)),
+            // max_tokens = Math.Max(700, loadout.MaxTokens * 3),
             messages = new object[]
             {
                 new { role = "system", content = systemPrompt },

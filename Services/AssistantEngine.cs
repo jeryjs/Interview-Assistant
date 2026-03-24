@@ -330,26 +330,9 @@ public sealed class AssistantEngine : IDisposable
             transcriptContext = "No recent transcript context available.";
         }
 
-        try
+        await foreach (var chunk in _providerClient.StreamTopicMarkdownAsync(loadout, topic, transcriptContext, cancellationToken).WithCancellation(cancellationToken))
         {
-            await foreach (var chunk in _providerClient.StreamTopicMarkdownAsync(loadout, topic, transcriptContext, cancellationToken).WithCancellation(cancellationToken))
-            {
-                yield return chunk;
-            }
-        }
-        catch (OperationCanceledException)
-        {
-            throw;
-        }
-        catch (Exception ex)
-        {
-            var safeMessage = ex.Message.Replace('\r', ' ').Replace('\n', ' ').Trim();
-            if (safeMessage.Length > 220)
-            {
-                safeMessage = safeMessage[..220] + "…";
-            }
-
-            yield return $"# {topic}\n\n> Provider call failed.\n\n`{safeMessage}`\n";
+            yield return chunk;
         }
     }
 
