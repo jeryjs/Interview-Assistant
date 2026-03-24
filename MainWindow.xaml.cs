@@ -48,6 +48,22 @@ public partial class MainWindow : Window
         _assistantEngine.TranscriptGenerated += line => Dispatcher.Invoke(() => OnTranscriptGenerated(line));
         _assistantEngine.ChipsGenerated += chips => Dispatcher.Invoke(() => OnChipsGenerated(chips));
         _assistantEngine.StatusChanged += message => Dispatcher.Invoke(() => SetStatus(message));
+        _assistantEngine.ScreenSourceUnavailable += message => Dispatcher.Invoke(() => OnScreenSourceUnavailable(message));
+    }
+
+    private async void OnScreenSourceUnavailable(string message)
+    {
+        if (_state.ScreenShareEnabled)
+        {
+            _state.ScreenShareEnabled = false;
+            _suppressToggleHandlers = true;
+            ScreenToggle.IsChecked = false;
+            _suppressToggleHandlers = false;
+            _assistantEngine.SetCaptureState(_state.MicEnabled, _state.SystemAudioEnabled, _state.ScreenShareEnabled);
+            await AppStateStore.SaveAsync(_state);
+        }
+
+        SetStatus(message);
     }
 
     private void OnTranscriptGenerated(string line)

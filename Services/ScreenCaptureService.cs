@@ -19,10 +19,12 @@ public sealed class ScreenCaptureService : IDisposable
     private ScreenSourceMode _sourceMode = ScreenSourceMode.EntireScreen;
     private long _sourceWindowHandle;
     private string _sourceWindowTitle = string.Empty;
+    private bool _sourceInvalidNotified;
 
     private double[]? _lastHistogram;
 
     public event Action<string>? StatusChanged;
+    public event Action<string>? SourceUnavailable;
 
     public void SetSource(ScreenSourceMode mode, long windowHandle, string windowTitle)
     {
@@ -31,6 +33,7 @@ public sealed class ScreenCaptureService : IDisposable
             _sourceMode = mode;
             _sourceWindowHandle = mode == ScreenSourceMode.SpecificWindow ? windowHandle : 0;
             _sourceWindowTitle = mode == ScreenSourceMode.SpecificWindow ? windowTitle : string.Empty;
+            _sourceInvalidNotified = false;
         }
     }
 
@@ -47,6 +50,7 @@ public sealed class ScreenCaptureService : IDisposable
 
             if (_enabled)
             {
+                _sourceInvalidNotified = false;
                 _captureCts = new CancellationTokenSource();
                 _captureTask = Task.Run(() => CaptureLoopAsync(_captureCts.Token));
                 StatusChanged?.Invoke("Screen capture started");
@@ -85,6 +89,17 @@ public sealed class ScreenCaptureService : IDisposable
                     _frameHistory.RemoveAll(item => item.Timestamp < cutoff);
                 }
             }
+            catch (ScreenSourceUnavailableException ex)
+            {
+                if (!_sourceInvalidNotified)
+                {
+                    _sourceInvalidNotified = true;
+                    SourceUnavailable?.Invoke(ex.Message);
+                }
+
+                SetEnabled(false);
+                return;
+            }
             catch (Exception ex)
             {
                 StatusChanged?.Invoke($"Screen capture failed: {ex.Message}");
@@ -114,7 +129,7 @@ public sealed class ScreenCaptureService : IDisposable
         {
             if (!WindowCatalogService.TryGetWindowBounds(sourceWindowHandle, out var bounds))
             {
-                throw new InvalidOperationException("Selected screen-share window is no longer available.");
+                throw new ScreenSourceUnavailableException("Shared window is unavailable. Screen share turned off.");
             }
 
             left = bounds.Left;
@@ -210,6 +225,14 @@ public sealed class ScreenCaptureService : IDisposable
             _captureTask = null;
             _captureCts = null;
             _enabled = false;
+        }
+    }
+
+    private sealed class ScreenSourceUnavailableException : Exception
+    {
+        public ScreenSourceUnavailableException(string message)
+            : base(message)
+        {
         }
     }
 }

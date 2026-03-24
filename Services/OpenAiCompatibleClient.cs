@@ -59,6 +59,7 @@ public sealed class OpenAiCompatibleClient
         string transcriptContext,
         [EnumeratorCancellation] CancellationToken cancellationToken)
     {
+        // todo: make this prompt more detailed and robust, and consider adding relevant keyframe images as context too, the resulting prompt is expected to be 10x longer.
         var systemPrompt = "You are an elite interview copilot. Output clean markdown only, no preface. Include concise answer, deep dive, pitfalls, sample Q/A, and concrete code-level examples where relevant.";
         var userPrompt = $"Generate an interview aid markdown doc for topic: {topic}\n\nTranscript context:\n{transcriptContext}\n\nConstraints: Use headings, bullets, and short paragraphs; keep high signal and practical depth.";
 

@@ -37,6 +37,7 @@ public sealed class AssistantEngine : IDisposable
     public event Action<string>? TranscriptGenerated;
     public event Action<IReadOnlyList<ChipItem>>? ChipsGenerated;
     public event Action<string>? StatusChanged;
+    public event Action<string>? ScreenSourceUnavailable;
 
     public AssistantEngine(AppState state)
     {
@@ -52,7 +53,16 @@ public sealed class AssistantEngine : IDisposable
         _audioCapture.SpeechDetected += OnSpeechDetected;
         _audioCapture.StatusChanged += message => StatusChanged?.Invoke(message);
         _screenCapture.StatusChanged += message => StatusChanged?.Invoke(message);
+        _screenCapture.SourceUnavailable += OnScreenSourceUnavailable;
         _whisperTranscriber.StatusChanged += message => StatusChanged?.Invoke(message);
+    }
+
+    private void OnScreenSourceUnavailable(string message)
+    {
+        _screenEnabled = false;
+        _state.ScreenShareEnabled = false;
+        ScreenSourceUnavailable?.Invoke(message);
+        StatusChanged?.Invoke(message);
     }
 
     public void Start()
