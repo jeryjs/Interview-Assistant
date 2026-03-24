@@ -19,6 +19,7 @@ public sealed class OpenAiCompatibleClient
         ProviderLoadout loadout,
         string modelId,
         string transcriptContext,
+        string latestFocus,
         IReadOnlyList<FrameSnapshot> keyframes,
         IReadOnlyList<string> existingChips,
         bool includeImages,
@@ -28,8 +29,8 @@ public sealed class OpenAiCompatibleClient
         {
             ["model"] = string.IsNullOrWhiteSpace(modelId) ? loadout.ModelId : modelId,
             ["stream"] = true,
-            ["temperature"] = loadout.Temperature,
-            ["max_tokens"] = Math.Max(200, loadout.MaxTokens),
+            // ["temperature"] = loadout.Temperature,
+            // ["max_tokens"] = Math.Max(200, loadout.MaxTokens),
             ["messages"] = new object[]
             {
                 new
@@ -41,7 +42,7 @@ public sealed class OpenAiCompatibleClient
                 {
                     role = "user",
                     content = BuildUserContent(
-                        BuildRecommendationUserPrompt(transcriptContext, keyframes, existingChips),
+                        BuildRecommendationUserPrompt(transcriptContext, latestFocus, keyframes, existingChips),
                         keyframes,
                         includeImages),
                 },
@@ -374,13 +375,16 @@ You produce recommendation chips for live interviews.
 Your default action is restraint: emit nothing unless there is clear, high-value signal.
 
 Hard output format:
-1) Plain text lines only.
-2) Each line is one chip, 1-4 words.
-3) No numbering, no punctuation decorations, no explanations.
-4) Max 4 chips total. Min 1. Recommended: 1. If more is strongly warranted then 2 or 3, rarely 4.
-5) If no strong recommendation exists, output exactly: NO_CHIPS
+1) Plain text only.
+2) Return chips in ONE line using exact delimiter: |||
+3) Format example: chip one ||| chip two ||| chip three
+4) Each chip is 1-4 words.
+5) No numbering, no bullets, no markdown, no explanations.
+6) Max 4 chips total.
+7) If no strong recommendation exists, output exactly: NO_CHIPS
 
 Decision policy:
+- MAXIMIZE relevance to the latest utterance first; older context is secondary.
 - Generate chips only when they materially improve the next answer.
 - Reject vague, repetitive, or low-specificity topics.
 - Avoid synonyms of existing chips.
@@ -396,6 +400,7 @@ Compression policy:
 
     private static string BuildRecommendationUserPrompt(
         string transcriptContext,
+        string latestFocus,
         IReadOnlyList<FrameSnapshot> keyframes,
         IReadOnlyList<string> existingChips)
     {
@@ -409,6 +414,9 @@ Compression policy:
 
         return $"""
 Create recommendation chips from this live context.
+
+    Latest utterance focus (highest priority):
+    {latestFocus}
 
 Transcript (recent context window):
 {transcriptContext}
