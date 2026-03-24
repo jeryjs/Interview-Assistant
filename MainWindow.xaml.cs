@@ -19,7 +19,6 @@ public partial class MainWindow : Window
     private readonly ObservableCollection<ChipItem> _chipFeed = [];
     private readonly ObservableCollection<RecommendationEvent> _timelineEvents = [];
     private readonly ObservableCollection<UiLogEntry> _logs = [];
-    private readonly ObservableCollection<string> _quickModelOptions = [];
     private readonly ICollectionView _timelineView;
     private readonly List<string> _pendingTranscriptLines = [];
 
@@ -30,7 +29,6 @@ public partial class MainWindow : Window
     private ThreadWindow? _threadWindow;
     private RecommendationEvent? _activeTranscriptEvent;
     private bool _suppressToggleHandlers;
-    private bool _suppressModelEvents;
     private bool _suppressContextWindowEvents;
     private string _chipSearchText = string.Empty;
 
@@ -44,8 +42,6 @@ public partial class MainWindow : Window
 
         TimelineItemsControl.ItemsSource = _timelineView;
         LogList.ItemsSource = _logs;
-        ChipModelCombo.ItemsSource = _quickModelOptions;
-        TopicModelCombo.ItemsSource = _quickModelOptions;
 
         ApplyTheme(ThemeService.IsDarkTheme());
         ApplyStateToUi();
@@ -164,7 +160,6 @@ public partial class MainWindow : Window
         _suppressContextWindowEvents = false;
 
         ApplyScreenSourceToEngine();
-        RefreshQuickModelUi();
         _assistantEngine.SetCaptureState(_state.MicEnabled, _state.SystemAudioEnabled, _state.ScreenShareEnabled);
         _chipFeed.Clear();
         foreach (var chip in _state.ChipFeed)
@@ -389,60 +384,6 @@ public partial class MainWindow : Window
         SetStatus("Provider settings saved");
     }
 
-    private void RefreshQuickModelUi()
-    {
-        _suppressModelEvents = true;
-
-        var activeLoadout = _state.ResolveActiveLoadout();
-        if (string.IsNullOrWhiteSpace(activeLoadout.ChipModelId))
-        {
-            activeLoadout.ChipModelId = activeLoadout.ModelId;
-        }
-
-        if (string.IsNullOrWhiteSpace(activeLoadout.TopicModelId))
-        {
-            activeLoadout.TopicModelId = activeLoadout.ModelId;
-        }
-
-        var options = _state.ProviderLoadouts
-            .SelectMany(loadout => new[]
-            {
-                loadout.ModelId,
-                loadout.ChipModelId,
-                loadout.TopicModelId,
-            })
-            .Where(model => !string.IsNullOrWhiteSpace(model))
-            .Select(model => model.Trim())
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .OrderBy(model => model, StringComparer.OrdinalIgnoreCase)
-            .ToList();
-
-        if (options.Count == 0)
-        {
-            options.Add("gpt-4o-mini");
-            options.Add("gpt-4.1-mini");
-            options.Add("gpt-4.1");
-        }
-
-        _quickModelOptions.Clear();
-        foreach (var option in options)
-        {
-            _quickModelOptions.Add(option);
-        }
-
-        ChipModelCombo.Text = activeLoadout.ResolveChipModelId();
-        TopicModelCombo.Text = activeLoadout.ResolveTopicModelId();
-        ChipModelCombo.ToolTip = $"Chip model: {activeLoadout.ResolveChipModelId()}";
-        TopicModelCombo.ToolTip = $"Topic model: {activeLoadout.ResolveTopicModelId()}";
-
-        _suppressModelEvents = false;
-    }
-
-    private async void OnQuickModelSelectionChanged(object sender, SelectionChangedEventArgs e)
-    {
-        await ApplyQuickModelSelectionAsync(sender as ComboBox);
-    }
-
     private void OnContextWindowValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
     {
         if (_suppressContextWindowEvents)
@@ -557,47 +498,6 @@ public partial class MainWindow : Window
     private void UpdateContextWindowLabel()
     {
         ContextSecondsLabel.Text = $"Ctx {_state.ContextWindowSeconds}s";
-    }
-
-    private async void OnQuickModelCommit(object sender, RoutedEventArgs e)
-    {
-        await ApplyQuickModelSelectionAsync(sender as ComboBox);
-    }
-
-    private async Task ApplyQuickModelSelectionAsync(ComboBox? combo)
-    {
-        if (_suppressModelEvents || combo is null)
-        {
-            return;
-        }
-
-        var selectedModel = combo.Text?.Trim() ?? string.Empty;
-        if (string.IsNullOrWhiteSpace(selectedModel))
-        {
-            return;
-        }
-
-        var activeLoadout = _state.ResolveActiveLoadout();
-        var isChipModel = ReferenceEquals(combo, ChipModelCombo);
-        if (isChipModel)
-        {
-            activeLoadout.ChipModelId = selectedModel;
-        }
-        else
-        {
-            activeLoadout.TopicModelId = selectedModel;
-        }
-
-        if (!_quickModelOptions.Any(existing => string.Equals(existing, selectedModel, StringComparison.OrdinalIgnoreCase)))
-        {
-            _quickModelOptions.Insert(0, selectedModel);
-        }
-
-        await AppStateStore.SaveAsync(_state);
-        SetStatus(isChipModel
-            ? $"Chip model set to {selectedModel}"
-            : $"Topic model set to {selectedModel}");
-        RefreshQuickModelUi();
     }
 
     private async void OnOpenScreenSourceSettings(object sender, RoutedEventArgs e)

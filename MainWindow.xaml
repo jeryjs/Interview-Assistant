@@ -129,20 +129,6 @@
                                Margin="0,0,12,0" />
 
                     <WrapPanel Grid.Column="1" VerticalAlignment="Center">
-                        <ComboBox x:Name="ChipModelCombo"
-                                  Width="140"
-                                  Margin="0,0,8,0"
-                                  IsEditable="True"
-                                  ToolTip="Quick chip model"
-                                  SelectionChanged="OnQuickModelSelectionChanged"
-                                  LostKeyboardFocus="OnQuickModelCommit" />
-                        <ComboBox x:Name="TopicModelCombo"
-                                  Width="140"
-                                  Margin="0,0,8,0"
-                                  IsEditable="True"
-                                  ToolTip="Quick topic model"
-                                  SelectionChanged="OnQuickModelSelectionChanged"
-                                  LostKeyboardFocus="OnQuickModelCommit" />
                         <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,8,0">
                             <TextBlock x:Name="ContextSecondsLabel"
                                        Foreground="{DynamicResource SecondaryTextBrush}"

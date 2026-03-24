@@ -37,7 +37,9 @@
                 <DataGridTextColumn Header="Name" Binding="{Binding Name, UpdateSourceTrigger=PropertyChanged}" Width="1.1*" />
                 <DataGridTextColumn Header="Endpoint" Binding="{Binding Endpoint, UpdateSourceTrigger=PropertyChanged}" Width="2.4*" />
                 <DataGridTextColumn Header="API Key" Binding="{Binding ApiKey, UpdateSourceTrigger=PropertyChanged}" Width="1.8*" />
-                <DataGridTextColumn Header="Model ID" Binding="{Binding ModelId, UpdateSourceTrigger=PropertyChanged}" Width="1.15*" />
+                <DataGridTextColumn Header="Default Model" Binding="{Binding ModelId, UpdateSourceTrigger=PropertyChanged}" Width="1.05*" />
+                <DataGridTextColumn Header="Chip Model" Binding="{Binding ChipModelId, UpdateSourceTrigger=PropertyChanged}" Width="1.05*" />
+                <DataGridTextColumn Header="Topic Model" Binding="{Binding TopicModelId, UpdateSourceTrigger=PropertyChanged}" Width="1.05*" />
                 <DataGridTextColumn Header="Temp" Binding="{Binding Temperature, UpdateSourceTrigger=PropertyChanged}" Width="0.6*" />
                 <DataGridTextColumn Header="Max Tokens" Binding="{Binding MaxTokens, UpdateSourceTrigger=PropertyChanged}" Width="0.8*" />
             </DataGrid.Columns>

@@ -80,6 +80,15 @@ public partial class LoadoutDialog : Window
         {
             loadout.Temperature = Math.Clamp(loadout.Temperature, 0f, 1.5f);
             loadout.MaxTokens = Math.Clamp(loadout.MaxTokens, 128, 4096);
+            if (string.IsNullOrWhiteSpace(loadout.ChipModelId))
+            {
+                loadout.ChipModelId = loadout.ModelId;
+            }
+
+            if (string.IsNullOrWhiteSpace(loadout.TopicModelId))
+            {
+                loadout.TopicModelId = loadout.ModelId;
+            }
         }
 
         var active = ActiveLoadoutCombo.SelectedItem as ProviderLoadout ?? _editableLoadouts[0];
