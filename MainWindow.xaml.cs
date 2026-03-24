@@ -16,11 +16,11 @@ namespace Naveen_Sir;
 /// </summary>
 public partial class MainWindow : Window
 {
-    private readonly ObservableCollection<string> _transcriptLines = [];
     private readonly ObservableCollection<ChipItem> _chipFeed = [];
+    private readonly ObservableCollection<RecommendationEvent> _timelineEvents = [];
     private readonly ObservableCollection<UiLogEntry> _logs = [];
     private readonly ObservableCollection<string> _quickModelOptions = [];
-    private readonly ICollectionView _chipView;
+    private readonly ICollectionView _timelineView;
 
     private readonly AppState _state;
     private readonly AssistantEngine _assistantEngine;
@@ -36,12 +36,11 @@ public partial class MainWindow : Window
     {
         _state = AppStateStore.Load();
         _assistantEngine = new AssistantEngine(_state);
-        _chipView = CollectionViewSource.GetDefaultView(_chipFeed);
-        _chipView.Filter = FilterChip;
+        _timelineView = CollectionViewSource.GetDefaultView(_timelineEvents);
+        _timelineView.Filter = FilterTimelineEvent;
         InitializeComponent();
 
-        TranscriptList.ItemsSource = _transcriptLines;
-        ChipItemsControl.ItemsSource = _chipView;
+        TimelineItemsControl.ItemsSource = _timelineView;
         LogList.ItemsSource = _logs;
         ChipModelCombo.ItemsSource = _quickModelOptions;
         TopicModelCombo.ItemsSource = _quickModelOptions;
@@ -80,31 +79,32 @@ public partial class MainWindow : Window
 
     private void OnTranscriptGenerated(string line)
     {
-        _transcriptLines.Add(line);
-        while (_transcriptLines.Count > 400)
-        {
-            _transcriptLines.RemoveAt(0);
-        }
-        TranscriptList.ScrollIntoView(_transcriptLines[^1]);
+        AddTimelineEvent("Transcript", line, []);
     }
 
     private void OnChipsGenerated(IReadOnlyList<ChipItem> chips)
     {
+        var newBatch = new List<ChipItem>();
         var existing = _chipFeed.Select(static c => c.Text).ToHashSet(StringComparer.OrdinalIgnoreCase);
         foreach (var chip in chips.Where(chip => !existing.Contains(chip.Text)))
         {
             EnsureChipPalette(chip);
-            _chipFeed.Add(chip);
+            _chipFeed.Insert(0, chip);
+            newBatch.Add(chip);
         }
 
         while (_chipFeed.Count > _state.MaxChipCount)
         {
-            _chipFeed.RemoveAt(0);
+            _chipFeed.RemoveAt(_chipFeed.Count - 1);
         }
 
         _state.ChipFeed = _chipFeed.ToList();
         _ = AppStateStore.SaveAsync(_state);
-        _chipView.Refresh();
+        if (newBatch.Count > 0)
+        {
+            AddTimelineEvent("Recommendations", $"{newBatch.Count} new chips", newBatch);
+        }
+
         SetStatus($"Updated chips at {DateTime.Now:HH:mm:ss}");
     }
 
@@ -124,7 +124,6 @@ public partial class MainWindow : Window
         ScreenToggle.IsChecked = _state.ScreenShareEnabled;
         TopmostToggle.IsChecked = _state.PinOnTop;
         Topmost = _state.PinOnTop;
-        TranscriptExpander.IsExpanded = _state.TranscriptExpanded;
         _suppressContextWindowEvents = true;
         ContextWindowSlider.Value = _state.ContextWindowSeconds;
         UpdateContextWindowLabel();
@@ -139,7 +138,7 @@ public partial class MainWindow : Window
             EnsureChipPalette(chip);
             _chipFeed.Add(chip);
         }
-        _chipView.Refresh();
+        RebuildTimelineFromChipHistory();
 
         var activeLoadout = _state.ResolveActiveLoadout();
         ProviderStatusText.Text = $"Provider: {activeLoadout.Name} · {activeLoadout.ModelId} · {activeLoadout.Endpoint}";
@@ -425,12 +424,12 @@ public partial class MainWindow : Window
     private void OnChipSearchChanged(object sender, TextChangedEventArgs e)
     {
         _chipSearchText = ChipSearchBox.Text?.Trim() ?? string.Empty;
-        _chipView.Refresh();
+        _timelineView.Refresh();
     }
 
-    private bool FilterChip(object item)
+    private bool FilterTimelineEvent(object item)
     {
-        if (item is not ChipItem chip)
+        if (item is not RecommendationEvent timelineEvent)
         {
             return false;
         }
@@ -440,7 +439,55 @@ public partial class MainWindow : Window
             return true;
         }
 
-        return chip.Text.Contains(_chipSearchText, StringComparison.OrdinalIgnoreCase);
+        return timelineEvent.Message.Contains(_chipSearchText, StringComparison.OrdinalIgnoreCase)
+            || timelineEvent.Chips.Any(chip => chip.Text.Contains(_chipSearchText, StringComparison.OrdinalIgnoreCase));
+    }
+
+    private void AddTimelineEvent(string kind, string message, IReadOnlyList<ChipItem> chips)
+    {
+        var timelineEvent = new RecommendationEvent
+        {
+            Kind = kind,
+            Message = message,
+            CreatedAt = DateTime.Now,
+            Chips = chips.OrderByDescending(chip => chip.CreatedAtUtc).ToList(),
+        };
+
+        _timelineEvents.Insert(0, timelineEvent);
+        const int maxEventCount = 260;
+        while (_timelineEvents.Count > maxEventCount)
+        {
+            _timelineEvents.RemoveAt(_timelineEvents.Count - 1);
+        }
+
+        _timelineView.Refresh();
+    }
+
+    private void RebuildTimelineFromChipHistory()
+    {
+        _timelineEvents.Clear();
+
+        var groups = _chipFeed
+            .OrderByDescending(chip => chip.CreatedAtUtc)
+            .GroupBy(chip => chip.CreatedAtUtc.ToString("yyyyMMddHHmmss"));
+
+        foreach (var group in groups)
+        {
+            var groupChips = group
+                .OrderByDescending(chip => chip.CreatedAtUtc)
+                .ToList();
+
+            var latestTimestamp = groupChips[0].CreatedAtUtc.ToLocalTime();
+            _timelineEvents.Add(new RecommendationEvent
+            {
+                Kind = "Recommendations",
+                CreatedAt = latestTimestamp,
+                Message = $"{groupChips.Count} saved chips",
+                Chips = groupChips,
+            });
+        }
+
+        _timelineView.Refresh();
     }
 
     private void UpdateContextWindowLabel()
@@ -529,6 +576,7 @@ public partial class MainWindow : Window
     private async void OnClearChips(object sender, RoutedEventArgs e)
     {
         _chipFeed.Clear();
+        _timelineEvents.Clear();
         _state.ChipFeed.Clear();
         _state.ThreadCache.Clear();
         await AppStateStore.SaveAsync(_state);
@@ -622,18 +670,6 @@ public partial class MainWindow : Window
         Topmost = _state.PinOnTop;
         await AppStateStore.SaveAsync(_state);
         SetStatus(_state.PinOnTop ? "Pinned on top" : "Pin released");
-    }
-
-    private async void OnTranscriptExpanded(object sender, RoutedEventArgs e)
-    {
-        _state.TranscriptExpanded = true;
-        await AppStateStore.SaveAsync(_state);
-    }
-
-    private async void OnTranscriptCollapsed(object sender, RoutedEventArgs e)
-    {
-        _state.TranscriptExpanded = false;
-        await AppStateStore.SaveAsync(_state);
     }
 
     private void OnSystemPreferenceChanged(object sender, UserPreferenceChangedEventArgs e)

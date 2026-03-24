@@ -345,18 +345,32 @@ public sealed class AssistantEngine : IDisposable
         StatusChanged?.Invoke($"Sending context to provider: {frames.Count} keyframes, {currentChips.Count} chips");
 
         var streamBuffer = new StringBuilder();
+        var generatedChips = new List<ChipItem>();
         await foreach (var chunk in _providerClient.StreamRecommendationTextAsync(loadout, chipModelId, transcriptContext, frames, currentChips, includeImages: _screenEnabled, cancellationToken))
         {
             streamBuffer.Append(chunk);
             foreach (var chip in DrainChipsFromBuffer(streamBuffer))
             {
-                EmitChip(chip, loadout, chipModelId);
+                var created = EmitChip(chip, loadout, chipModelId);
+                if (created is not null)
+                {
+                    generatedChips.Add(created);
+                }
             }
         }
 
         foreach (var chip in ParseChips(streamBuffer.ToString()))
         {
-            EmitChip(chip, loadout, chipModelId);
+            var created = EmitChip(chip, loadout, chipModelId);
+            if (created is not null)
+            {
+                generatedChips.Add(created);
+            }
+        }
+
+        if (generatedChips.Count > 0)
+        {
+            ChipsGenerated?.Invoke(generatedChips);
         }
     }
 
@@ -411,18 +425,18 @@ public sealed class AssistantEngine : IDisposable
         return normalized;
     }
 
-    private void EmitChip(string chipText, ProviderLoadout loadout, string chipModelId)
+    private ChipItem? EmitChip(string chipText, ProviderLoadout loadout, string chipModelId)
     {
         if (string.IsNullOrWhiteSpace(chipText) || chipText.Length < 3)
         {
-            return;
+            return null;
         }
 
         lock (_stateLock)
         {
             if (!_chipTextSet.Add(chipText))
             {
-                return;
+                return null;
             }
 
             _chipOrder.Add(chipText);
@@ -433,20 +447,17 @@ public sealed class AssistantEngine : IDisposable
         }
 
         var palette = ChipColorService.ForText(chipText);
-
-        ChipsGenerated?.Invoke([
-            new ChipItem
-            {
-                Id = Guid.NewGuid().ToString("N"),
-                Text = chipText,
-                CreatedAtUtc = DateTime.UtcNow,
-                SourceModel = chipModelId,
-                SourceProviderName = loadout.Name,
-                BorderColor = palette.BorderHex,
-                GradientStartColor = palette.GradientStartHex,
-                GradientEndColor = palette.GradientEndHex,
-            },
-        ]);
+        return new ChipItem
+        {
+            Id = Guid.NewGuid().ToString("N"),
+            Text = chipText,
+            CreatedAtUtc = DateTime.UtcNow,
+            SourceModel = chipModelId,
+            SourceProviderName = loadout.Name,
+            BorderColor = palette.BorderHex,
+            GradientStartColor = palette.GradientStartHex,
+            GradientEndColor = palette.GradientEndHex,
+        };
     }
 
     public async IAsyncEnumerable<string> StreamTopicOverviewAsync(

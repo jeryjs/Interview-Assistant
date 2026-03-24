@@ -209,25 +209,54 @@
                         </Grid>
 
                         <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
-                            <ItemsControl x:Name="ChipItemsControl">
+                            <ItemsControl x:Name="TimelineItemsControl">
                                 <ItemsControl.ItemsPanel>
                                     <ItemsPanelTemplate>
-                                        <WrapPanel />
+                                        <StackPanel />
                                     </ItemsPanelTemplate>
                                 </ItemsControl.ItemsPanel>
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate>
-                                        <Button Style="{StaticResource ChipButtonStyle}"
-                                                Content="{Binding Text}"
-                                                BorderBrush="{Binding BorderColor}"
-                                                Click="OnChipClick">
-                                            <Button.Background>
-                                                <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
-                                                    <GradientStop Color="{Binding GradientStartColor}" Offset="0" />
-                                                    <GradientStop Color="{Binding GradientEndColor}" Offset="1" />
-                                                </LinearGradientBrush>
-                                            </Button.Background>
-                                        </Button>
+                                        <Border Margin="0,0,0,10"
+                                                Padding="8"
+                                                CornerRadius="10"
+                                                Background="#7A111A27"
+                                                BorderBrush="#2F4562"
+                                                BorderThickness="1">
+                                            <StackPanel>
+                                                <TextBlock Text="{Binding HeaderText}"
+                                                           Foreground="{DynamicResource SecondaryTextBrush}"
+                                                           FontSize="11"
+                                                           FontWeight="SemiBold"
+                                                           Margin="0,0,0,4" />
+                                                <TextBlock Text="{Binding Message}"
+                                                           Foreground="{DynamicResource PrimaryTextBrush}"
+                                                           TextWrapping="Wrap"
+                                                           Margin="0,0,0,6" />
+                                                <ItemsControl ItemsSource="{Binding Chips}">
+                                                    <ItemsControl.ItemsPanel>
+                                                        <ItemsPanelTemplate>
+                                                            <WrapPanel />
+                                                        </ItemsPanelTemplate>
+                                                    </ItemsControl.ItemsPanel>
+                                                    <ItemsControl.ItemTemplate>
+                                                        <DataTemplate>
+                                                            <Button Style="{StaticResource ChipButtonStyle}"
+                                                                    Content="{Binding Text}"
+                                                                    BorderBrush="{Binding BorderColor}"
+                                                                    Click="OnChipClick">
+                                                                <Button.Background>
+                                                                    <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                                                                        <GradientStop Color="{Binding GradientStartColor}" Offset="0" />
+                                                                        <GradientStop Color="{Binding GradientEndColor}" Offset="1" />
+                                                                    </LinearGradientBrush>
+                                                                </Button.Background>
+                                                            </Button>
+                                                        </DataTemplate>
+                                                    </ItemsControl.ItemTemplate>
+                                                </ItemsControl>
+                                            </StackPanel>
+                                        </Border>
                                     </DataTemplate>
                                 </ItemsControl.ItemTemplate>
                             </ItemsControl>
@@ -239,32 +268,6 @@
                         VerticalAlignment="Top"
                         Width="360"
                         Margin="0,16,16,0"
-                        Padding="8"
-                        CornerRadius="12"
-                        Background="#C0101622"
-                        BorderBrush="{DynamicResource PanelBorderBrush}"
-                        BorderThickness="1"
-                        Panel.ZIndex="12">
-                    <Expander x:Name="TranscriptExpander"
-                              Foreground="{DynamicResource PrimaryTextBrush}"
-                              Header="Live transcript"
-                              IsExpanded="False"
-                              Expanded="OnTranscriptExpanded"
-                              Collapsed="OnTranscriptCollapsed">
-                        <ListBox x:Name="TranscriptList"
-                                 Height="220"
-                                 Margin="0,8,0,0"
-                                 Background="#A00A111B"
-                                 Foreground="{DynamicResource PrimaryTextBrush}"
-                                 BorderBrush="{DynamicResource PanelBorderBrush}"
-                                 BorderThickness="1" />
-                    </Expander>
-                </Border>
-
-                <Border HorizontalAlignment="Right"
-                        VerticalAlignment="Top"
-                        Width="360"
-                        Margin="0,272,16,0"
                         Padding="8"
                         CornerRadius="12"
                         Background="#B0101622"

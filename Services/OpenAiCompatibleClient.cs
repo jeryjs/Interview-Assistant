@@ -264,7 +264,7 @@ Hard output format:
 1) Plain text lines only.
 2) Each line is one chip, 1-4 words.
 3) No numbering, no punctuation decorations, no explanations.
-4) Max 4 chips total. Min 0. Recommended: 0 or 1. If more is strongly warranted then 2 or 3, rarely 4.
+4) Max 4 chips total. Min 0. Recommended: 1. If more is strongly warranted then 2 or 3, rarely 4.
 5) If no strong recommendation exists, output exactly: NO_CHIPS
 
 Decision policy:
