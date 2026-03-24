@@ -57,6 +57,7 @@ public static class AppStateStore
             ScreenSourceWindowTitle = state.ScreenSourceWindowTitle,
             PinOnTop = state.PinOnTop,
             TranscriptExpanded = state.TranscriptExpanded,
+            ContextWindowSeconds = state.ContextWindowSeconds,
             WhisperModelPath = state.WhisperModelPath,
             WhisperLanguage = state.WhisperLanguage,
             MaxChipCount = state.MaxChipCount,

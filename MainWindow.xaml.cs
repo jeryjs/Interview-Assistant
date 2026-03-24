@@ -29,6 +29,7 @@ public partial class MainWindow : Window
     private ThreadWindow? _threadWindow;
     private bool _suppressToggleHandlers;
     private bool _suppressModelEvents;
+    private bool _suppressContextWindowEvents;
     private string _chipSearchText = string.Empty;
 
     public MainWindow()
@@ -124,6 +125,10 @@ public partial class MainWindow : Window
         TopmostToggle.IsChecked = _state.PinOnTop;
         Topmost = _state.PinOnTop;
         TranscriptExpander.IsExpanded = _state.TranscriptExpanded;
+        _suppressContextWindowEvents = true;
+        ContextWindowSlider.Value = _state.ContextWindowSeconds;
+        UpdateContextWindowLabel();
+        _suppressContextWindowEvents = false;
 
         ApplyScreenSourceToEngine();
         RefreshQuickModelUi();
@@ -405,6 +410,18 @@ public partial class MainWindow : Window
         await ApplyQuickModelSelectionAsync(sender as ComboBox);
     }
 
+    private void OnContextWindowValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+    {
+        if (_suppressContextWindowEvents)
+        {
+            return;
+        }
+
+        _state.ContextWindowSeconds = (int)Math.Round(ContextWindowSlider.Value);
+        UpdateContextWindowLabel();
+        _ = AppStateStore.SaveAsync(_state);
+    }
+
     private void OnChipSearchChanged(object sender, TextChangedEventArgs e)
     {
         _chipSearchText = ChipSearchBox.Text?.Trim() ?? string.Empty;
@@ -424,6 +441,11 @@ public partial class MainWindow : Window
         }
 
         return chip.Text.Contains(_chipSearchText, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private void UpdateContextWindowLabel()
+    {
+        ContextSecondsLabel.Text = $"Ctx {_state.ContextWindowSeconds}s";
     }
 
     private async void OnQuickModelCommit(object sender, RoutedEventArgs e)
@@ -564,6 +586,11 @@ public partial class MainWindow : Window
                 }
 
                 await _threadWindow.AppendMarkdownAsync(chunk);
+            }
+
+            if (_threadWindow is not null)
+            {
+                await _threadWindow.FlushAsync();
             }
 
             if (_threadWindow is not null)

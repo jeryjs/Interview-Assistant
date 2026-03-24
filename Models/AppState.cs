@@ -11,6 +11,7 @@ public sealed class AppState
     public string ScreenSourceWindowTitle { get; set; } = string.Empty;
     public bool PinOnTop { get; set; }
     public bool TranscriptExpanded { get; set; } = false;
+    public int ContextWindowSeconds { get; set; } = 30;
     public string WhisperModelPath { get; set; } = string.Empty;
     public string WhisperLanguage { get; set; } = "en";
     public int MaxChipCount { get; set; } = 220;
@@ -35,6 +36,8 @@ public sealed class AppState
         {
             MaxChipCount = 220;
         }
+
+        ContextWindowSeconds = Math.Clamp(ContextWindowSeconds, 10, 180);
 
         if (!string.Equals(ScreenSourceMode, "EntireScreen", StringComparison.Ordinal)
             && !string.Equals(ScreenSourceMode, "SpecificWindow", StringComparison.Ordinal))

@@ -21,11 +21,12 @@ public sealed class OpenAiCompatibleClient
         string transcriptContext,
         IReadOnlyList<FrameSnapshot> keyframes,
         IReadOnlyList<string> existingChips,
+        bool includeImages,
         [EnumeratorCancellation] CancellationToken cancellationToken)
     {
         var systemPrompt = BuildRecommendationSystemPrompt();
         var userText = BuildRecommendationUserPrompt(transcriptContext, keyframes, existingChips);
-        var userContent = BuildUserContent(userText, keyframes);
+        var userContent = BuildUserContent(userText, keyframes, includeImages);
 
         var payload = new
         {
@@ -179,7 +180,7 @@ public sealed class OpenAiCompatibleClient
         return string.Equals(mediaType, "text/event-stream", StringComparison.OrdinalIgnoreCase);
     }
 
-    private static object[] BuildUserContent(string promptText, IReadOnlyList<FrameSnapshot> keyframes)
+    private static object[] BuildUserContent(string promptText, IReadOnlyList<FrameSnapshot> keyframes, bool includeImages)
     {
         var list = new List<object>
         {
@@ -189,6 +190,11 @@ public sealed class OpenAiCompatibleClient
                 text = promptText,
             },
         };
+
+        if (!includeImages || keyframes.Count == 0)
+        {
+            return list.ToArray();
+        }
 
         foreach (var frame in keyframes)
         {

@@ -263,13 +263,14 @@ public sealed class AssistantEngine : IDisposable
         using var timer = new PeriodicTimer(TimeSpan.FromSeconds(1));
         while (await timer.WaitForNextTickAsync(cancellationToken))
         {
-            if (!HasTranscriptInWindow(TimeSpan.FromSeconds(30)))
+            var contextWindow = GetContextWindow();
+            if (!HasTranscriptInWindow(contextWindow))
             {
                 continue;
             }
 
             var now = DateTimeOffset.UtcNow;
-            var dueByMaxInterval = now - _lastRecommendationAt >= TimeSpan.FromSeconds(10);
+            var dueByMaxInterval = now - _lastRecommendationAt >= TimeSpan.FromSeconds(30);
             var dueByPause = now - _lastSpeechAt >= TimeSpan.FromSeconds(1.2)
                 && now - _lastRecommendationAt >= TimeSpan.FromSeconds(2.4);
 
@@ -316,10 +317,11 @@ public sealed class AssistantEngine : IDisposable
     {
         string transcriptContext;
         List<string> currentChips;
+        var contextWindow = GetContextWindow();
 
         lock (_stateLock)
         {
-            var cutoff = DateTimeOffset.UtcNow - TimeSpan.FromSeconds(30);
+            var cutoff = DateTimeOffset.UtcNow - contextWindow;
             transcriptContext = string.Join(
                 "\n",
                 _transcriptHistory
@@ -337,13 +339,13 @@ public sealed class AssistantEngine : IDisposable
         var loadout = _state.ResolveActiveLoadout();
         var chipModelId = loadout.ResolveChipModelId();
         var frames = _screenEnabled
-            ? _screenCapture.GetTopKeyframes(TimeSpan.FromSeconds(30), 10)
+            ? _screenCapture.GetTopKeyframes(contextWindow, 10)
             : [];
 
         StatusChanged?.Invoke($"Sending context to provider: {frames.Count} keyframes, {currentChips.Count} chips");
 
         var streamBuffer = new StringBuilder();
-        await foreach (var chunk in _providerClient.StreamRecommendationTextAsync(loadout, chipModelId, transcriptContext, frames, currentChips, cancellationToken))
+        await foreach (var chunk in _providerClient.StreamRecommendationTextAsync(loadout, chipModelId, transcriptContext, frames, currentChips, includeImages: _screenEnabled, cancellationToken))
         {
             streamBuffer.Append(chunk);
             foreach (var chip in DrainChipsFromBuffer(streamBuffer))
@@ -445,9 +447,10 @@ public sealed class AssistantEngine : IDisposable
         [EnumeratorCancellation] CancellationToken cancellationToken)
     {
         string transcriptContext;
+        var contextWindow = GetContextWindow();
         lock (_stateLock)
         {
-            var cutoff = DateTimeOffset.UtcNow - TimeSpan.FromSeconds(45);
+            var cutoff = DateTimeOffset.UtcNow - contextWindow;
             transcriptContext = string.Join(
                 "\n",
                 _transcriptHistory
@@ -465,6 +468,12 @@ public sealed class AssistantEngine : IDisposable
         {
             yield return chunk;
         }
+    }
+
+    private TimeSpan GetContextWindow()
+    {
+        var seconds = Math.Clamp(_state.ContextWindowSeconds, 10, 180);
+        return TimeSpan.FromSeconds(seconds);
     }
 
     public void Dispose()

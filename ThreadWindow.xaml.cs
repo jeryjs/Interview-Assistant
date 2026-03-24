@@ -13,6 +13,9 @@ public partial class ThreadWindow : Window
 
     private bool _webViewReady;
     private bool _isDarkTheme;
+    private bool _receivedFirstChunk;
+    private int _streamedCharCount;
+    private DateTime _lastRenderAt = DateTime.MinValue;
 
     public ThreadWindow()
     {
@@ -24,8 +27,12 @@ public partial class ThreadWindow : Window
     public async Task SetTopicAsync(string topic)
     {
         TopicTitleText.Text = topic;
-        StatusText.Text = "Generating...";
+        StatusText.Text = "Connecting…";
         _markdownBuilder.Clear();
+        _markdownBuilder.Append($"# {topic}\n\n> Preparing stream…\n\n- establishing provider connection\n- waiting for first tokens\n");
+        _receivedFirstChunk = false;
+        _streamedCharCount = 0;
+        _lastRenderAt = DateTime.MinValue;
         await RenderAsync();
     }
 
@@ -39,9 +46,34 @@ public partial class ThreadWindow : Window
 
     public async Task AppendMarkdownAsync(string chunk)
     {
+        if (!_receivedFirstChunk)
+        {
+            _receivedFirstChunk = true;
+            _markdownBuilder.Clear();
+        }
+
         _markdownBuilder.Append(chunk);
-        StatusText.Text = $"Streaming {DateTime.Now:HH:mm:ss}";
+        _streamedCharCount += chunk.Length;
+        StatusText.Text = $"Streaming… {_streamedCharCount} chars";
+
+        var now = DateTime.UtcNow;
+        if ((now - _lastRenderAt).TotalMilliseconds < 120)
+        {
+            return;
+        }
+
         await RenderAsync();
+        _lastRenderAt = now;
+    }
+
+    public async Task FlushAsync()
+    {
+        await RenderAsync();
+        _lastRenderAt = DateTime.UtcNow;
+        if (_receivedFirstChunk)
+        {
+            StatusText.Text = "Stream complete";
+        }
     }
 
     public string GetCurrentMarkdown()

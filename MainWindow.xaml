@@ -143,6 +143,21 @@
                                   ToolTip="Quick topic model"
                                   SelectionChanged="OnQuickModelSelectionChanged"
                                   LostKeyboardFocus="OnQuickModelCommit" />
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,8,0">
+                            <TextBlock x:Name="ContextSecondsLabel"
+                                       Foreground="{DynamicResource SecondaryTextBrush}"
+                                       VerticalAlignment="Center"
+                                       Margin="0,0,6,0"
+                                       FontSize="11"
+                                       Text="Ctx 30s" />
+                            <Slider x:Name="ContextWindowSlider"
+                                    Width="90"
+                                    Minimum="10"
+                                    Maximum="120"
+                                    TickFrequency="5"
+                                    IsSnapToTickEnabled="True"
+                                    ValueChanged="OnContextWindowValueChanged" />
+                        </StackPanel>
                         <ToggleButton x:Name="PauseToggle" Style="{StaticResource ControlToggleStyle}" Content="⏸" ToolTip="Pause all" Checked="OnPauseToggleChanged" Unchecked="OnPauseToggleChanged" />
                         <ToggleButton x:Name="MicToggle" Style="{StaticResource ControlToggleStyle}" Content="Mic" Checked="OnCaptureToggleChanged" Unchecked="OnCaptureToggleChanged" />
                         <ToggleButton x:Name="SystemToggle" Style="{StaticResource ControlToggleStyle}" Content="System" Checked="OnCaptureToggleChanged" Unchecked="OnCaptureToggleChanged" />
