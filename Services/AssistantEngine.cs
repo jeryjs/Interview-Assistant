@@ -395,6 +395,14 @@ public sealed class AssistantEngine : IDisposable
         var normalized = chip.Trim();
         normalized = normalized.TrimStart('-', '*', '•', '1', '2', '3', '4', '5', '6', '7', '8', '9', '0', '.', ')', ' ');
         normalized = normalized.Replace("\r", string.Empty, StringComparison.Ordinal);
+
+        if (string.Equals(normalized, "NO_CHIPS", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(normalized, "NONE", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(normalized, "NO CHIP", StringComparison.OrdinalIgnoreCase))
+        {
+            return string.Empty;
+        }
+
         if (normalized.Length > 90)
         {
             normalized = normalized[..90].Trim();

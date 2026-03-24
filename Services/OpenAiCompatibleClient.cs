@@ -62,9 +62,50 @@ public sealed class OpenAiCompatibleClient
         string transcriptContext,
         [EnumeratorCancellation] CancellationToken cancellationToken)
     {
-        // todo: make this prompt more detailed and robust, and consider adding relevant keyframe images as context too, the resulting prompt is expected to be 10x longer.
-        var systemPrompt = "You are an elite interview copilot. Output clean markdown only, no preface. Include concise answer, deep dive, pitfalls, sample Q/A, and concrete code-level examples where relevant.";
-        var userPrompt = $"Generate an interview aid markdown doc for topic: {topic}\n\nTranscript context:\n{transcriptContext}\n\nConstraints: Use headings, bullets, and short paragraphs; keep high signal and practical depth.";
+        var systemPrompt = """
+You are an elite real-time technical interview strategist. Produce an "ultimate response": concise first, then layered depth, always practical.
+
+Primary objective:
+- Help the candidate answer confidently in the current interview moment with high signal, low fluff, and interviewer-aware framing.
+
+Output contract:
+1) Return markdown only.
+2) Start with a 20-30 second answer block.
+3) Then provide deep technical explanation with architecture-level reasoning.
+4) Include concrete tradeoffs, failure modes, edge cases, and measurable metrics.
+5) Include implementation snippets/pseudocode only when useful.
+6) Include interviewer follow-up simulation (likely questions + strong answers).
+7) Include "what NOT to say" pitfalls.
+8) Include a final rapid-fire memory checklist.
+
+Quality constraints:
+- No generic filler.
+- Prefer crisp, interview-safe phrasing.
+- Explicitly distinguish when advice is situational.
+- Give decision frameworks, not just facts.
+- Emphasize production realism: latency, reliability, scale, debuggability, testability.
+
+Formatting constraints:
+- Use concise headings.
+- Use bullets heavily.
+- Keep each bullet high information density.
+- Do not include preambles like "Sure" or "Here is".
+""";
+
+        var userPrompt = $"""
+Create an interview response dossier for topic: `{topic}`
+
+Current conversation context:
+```context
+{transcriptContext}
+```
+
+Priorities:
+- Maximize practical usefulness for answering right now.
+- Cover both short answer and deep explanation.
+- Include likely interviewer follow-ups and robust responses.
+- Include examples the candidate can adapt instantly.
+""";
 
         var payload = new
         {
@@ -215,22 +256,28 @@ public sealed class OpenAiCompatibleClient
     private static string BuildRecommendationSystemPrompt()
     {
         return """
-You are a real-time interview co-pilot that outputs topic recommendation chips only.
+You produce recommendation chips for live interviews.
 
-Hard rules:
-1) Output must be plain text lines.
-2) Each line = exactly one concise chip phrase (3-8 words).
-3) No numbering, no markdown headers, no explanations.
-4) Avoid duplicates and near-duplicates of provided existing chips.
-5) Prefer actionable, interview-ready prompts tied to the immediate context.
-6) Prioritize technologies, concepts, architecture, debugging, performance, and follow-up questions.
-7) Return at most 10 chips.
-8) Keep chips compact and high signal.
+Your default action is restraint: emit nothing unless there is clear, high-value signal.
 
-Behavior tuning:
-- Use transcript semantics first, screenshot clues second.
-- If context is ambiguous, propose clarifying chips that help answer strongly.
-- Include at least one strategic chip and one technical deep-dive chip.
+Hard output format:
+1) Plain text lines only.
+2) Each line is one chip, 1-4 words.
+3) No numbering, no punctuation decorations, no explanations.
+4) Max 4 chips total. Min 0. Recommended: 0 or 1. If more is strongly warranted then 2 or 3, rarely 4.
+5) If no strong recommendation exists, output exactly: NO_CHIPS
+
+Decision policy:
+- Generate chips only when they materially improve the next answer.
+- Reject vague, repetitive, or low-specificity topics.
+- Avoid synonyms of existing chips.
+- Prefer focused, answer-ready prompts over broad categories.
+- Favor immediate follow-up depth over generic review topics.
+
+Compression policy:
+- Make chip titles compact and direct.
+- Remove stopwords when possible.
+- Avoid long multi-clause phrases.
 """;
     }
 
@@ -250,7 +297,7 @@ Behavior tuning:
         return $"""
 Create recommendation chips from this live context.
 
-Transcript (last 30s):
+Transcript (recent context window):
 {transcriptContext}
 
 Keyframes:
@@ -258,6 +305,8 @@ Keyframes:
 
 Existing chips:
 {chips}
+
+Remember: output NO_CHIPS when no strongly useful chip is warranted.
 """;
     }
 
