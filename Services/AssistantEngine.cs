@@ -30,10 +30,12 @@ public sealed class AssistantEngine : IDisposable
 
     private DateTimeOffset _lastSpeechAt = DateTimeOffset.UtcNow;
     private DateTimeOffset _lastRecommendationAt = DateTimeOffset.MinValue;
+    private DateTimeOffset _nextRecommendationAt = DateTimeOffset.UtcNow.AddSeconds(30);
 
     private bool _started;
     private bool _runtimeActive;
     private bool _isPaused;
+    private bool _isRecommendationInFlight;
     private bool _micEnabled;
     private bool _systemAudioEnabled;
     private bool _screenEnabled;
@@ -42,6 +44,7 @@ public sealed class AssistantEngine : IDisposable
     public event Action<IReadOnlyList<ChipItem>>? ChipsGenerated;
     public event Action<string>? StatusChanged;
     public event Action<string>? ScreenSourceUnavailable;
+    public event Action<bool>? RecommendationBusyChanged;
 
     public AssistantEngine(AppState state)
     {
@@ -158,6 +161,7 @@ public sealed class AssistantEngine : IDisposable
         }
 
         _runCts = new CancellationTokenSource();
+        _nextRecommendationAt = DateTimeOffset.UtcNow.AddSeconds(30);
         _audioCapture.SetEnabled(_micEnabled, _systemAudioEnabled);
         _screenCapture.SetEnabled(_screenEnabled);
         _transcriptionLoopTask = Task.Run(() => RunTranscriptionLoopAsync(_runCts.Token));
@@ -274,7 +278,7 @@ public sealed class AssistantEngine : IDisposable
             }
 
             var now = DateTimeOffset.UtcNow;
-            var dueByMaxInterval = now - _lastRecommendationAt >= TimeSpan.FromSeconds(30);
+            var dueByMaxInterval = now >= _nextRecommendationAt;
             var dueByPause = now - _lastSpeechAt >= TimeSpan.FromSeconds(1.2)
                 && now - _lastRecommendationAt >= TimeSpan.FromSeconds(2.4);
 
@@ -283,29 +287,73 @@ public sealed class AssistantEngine : IDisposable
                 continue;
             }
 
-            if (!await _recommendationLock.WaitAsync(0, cancellationToken))
+            await ExecuteRecommendationCycleAsync(cancellationToken, "auto");
+        }
+    }
+
+    private async Task<bool> ExecuteRecommendationCycleAsync(CancellationToken cancellationToken, string source)
+    {
+        if (!await _recommendationLock.WaitAsync(0, cancellationToken))
+        {
+            return false;
+        }
+
+        _isRecommendationInFlight = true;
+        RecommendationBusyChanged?.Invoke(true);
+
+        try
+        {
+            _lastRecommendationAt = DateTimeOffset.UtcNow;
+            _nextRecommendationAt = _lastRecommendationAt.AddSeconds(30);
+            await GenerateRecommendationsAsync(cancellationToken);
+            return true;
+        }
+        catch (OperationCanceledException)
+        {
+            if (string.Equals(source, "auto", StringComparison.Ordinal))
             {
-                continue;
+                throw;
             }
 
-            try
-            {
-                _lastRecommendationAt = DateTimeOffset.UtcNow;
-                await GenerateRecommendationsAsync(cancellationToken);
-            }
-            catch (OperationCanceledException)
-            {
-                return;
-            }
-            catch (Exception ex)
-            {
-                StatusChanged?.Invoke($"Recommendation loop failed: {ex.Message}");
-            }
-            finally
-            {
-                _recommendationLock.Release();
-            }
+            return false;
         }
+        catch (Exception ex)
+        {
+            StatusChanged?.Invoke($"Recommendation loop failed: {ex.Message}");
+            return false;
+        }
+        finally
+        {
+            _isRecommendationInFlight = false;
+            RecommendationBusyChanged?.Invoke(false);
+            _recommendationLock.Release();
+        }
+    }
+
+    public bool IsRecommendationBusy()
+    {
+        return _isRecommendationInFlight;
+    }
+
+    public TimeSpan GetTimeUntilNextRecommendation()
+    {
+        var remaining = _nextRecommendationAt - DateTimeOffset.UtcNow;
+        return remaining > TimeSpan.Zero ? remaining : TimeSpan.Zero;
+    }
+
+    public async Task<bool> TriggerRecommendationNowAsync(CancellationToken cancellationToken = default)
+    {
+        if (_isPaused || !_runtimeActive)
+        {
+            return false;
+        }
+
+        if (!HasTranscriptInWindow(GetContextWindow()))
+        {
+            return false;
+        }
+
+        return await ExecuteRecommendationCycleAsync(cancellationToken, "manual");
     }
 
     private bool HasTranscriptInWindow(TimeSpan window)

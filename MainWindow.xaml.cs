@@ -6,6 +6,7 @@ using System.Windows.Controls;
 using System.Windows.Data;
 using System.Windows.Media;
 using System.Windows.Input;
+using System.Windows.Threading;
 using Naveen_Sir.Models;
 using Naveen_Sir.Services;
 
@@ -32,6 +33,16 @@ public partial class MainWindow : Window
     private bool _suppressContextWindowEvents;
     private string _chipSearchText = string.Empty;
 
+    private readonly DispatcherTimer _liveFeedTimer = new()
+    {
+        Interval = TimeSpan.FromMilliseconds(400),
+    };
+
+    private bool _isDraggingLogPanel;
+    private Point _logDragStart;
+    private double _logPanelStartX;
+    private double _logPanelStartY;
+
     public MainWindow()
     {
         _state = AppStateStore.Load();
@@ -47,10 +58,13 @@ public partial class MainWindow : Window
         ApplyStateToUi();
         BindEngine();
         _assistantEngine.Start();
+        _liveFeedTimer.Tick += (_, _) => UpdateLiveFeedButton();
+        _liveFeedTimer.Start();
 
         SystemEvents.UserPreferenceChanged += OnSystemPreferenceChanged;
         SetStatus("Ready");
         OnGhostToggleChanged(this, new RoutedEventArgs());
+        UpdateLiveFeedButton();
     }
 
     private void BindEngine()
@@ -59,6 +73,13 @@ public partial class MainWindow : Window
         _assistantEngine.ChipsGenerated += chips => Dispatcher.Invoke(() => OnChipsGenerated(chips));
         _assistantEngine.StatusChanged += message => Dispatcher.Invoke(() => SetStatus(message));
         _assistantEngine.ScreenSourceUnavailable += message => Dispatcher.Invoke(() => OnScreenSourceUnavailable(message));
+        _assistantEngine.RecommendationBusyChanged += busy => Dispatcher.Invoke(() => OnRecommendationBusyChanged(busy));
+    }
+
+    private void OnRecommendationBusyChanged(bool busy)
+    {
+        LiveFeedButton.IsEnabled = !busy;
+        UpdateLiveFeedButton();
     }
 
     private async void OnScreenSourceUnavailable(string message)
@@ -230,15 +251,56 @@ public partial class MainWindow : Window
         chip.GradientEndColor = palette.GradientEndHex;
     }
 
-    private void OnLogItemSelected(object sender, SelectionChangedEventArgs e)
+    private void OnToggleLogExpansionClick(object sender, RoutedEventArgs e)
     {
-        if (LogList.SelectedItem is not UiLogEntry entry)
+        if (sender is not Button { DataContext: UiLogEntry entry })
         {
             return;
         }
 
         entry.IsExpanded = !entry.IsExpanded;
-        LogList.SelectedItem = null;
+    }
+
+    private void OnLogPanelDragStart(object sender, MouseButtonEventArgs e)
+    {
+        _isDraggingLogPanel = true;
+        _logDragStart = e.GetPosition(this);
+        _logPanelStartX = LogPanelTransform.X;
+        _logPanelStartY = LogPanelTransform.Y;
+        Mouse.Capture(sender as IInputElement);
+        e.Handled = true;
+    }
+
+    private void OnLogPanelDragMove(object sender, MouseEventArgs e)
+    {
+        if (!_isDraggingLogPanel)
+        {
+            return;
+        }
+
+        var current = e.GetPosition(this);
+        var dx = current.X - _logDragStart.X;
+        var dy = current.Y - _logDragStart.Y;
+
+        LogPanelTransform.X = _logPanelStartX + dx;
+        LogPanelTransform.Y = _logPanelStartY + dy;
+    }
+
+    private void OnLogPanelDragEnd(object sender, MouseButtonEventArgs e)
+    {
+        if (!_isDraggingLogPanel)
+        {
+            return;
+        }
+
+        _isDraggingLogPanel = false;
+        Mouse.Capture(null);
+        e.Handled = true;
+    }
+
+    private void OnLogPanelDragLostCapture(object sender, MouseEventArgs e)
+    {
+        _isDraggingLogPanel = false;
     }
 
     private async void OnCaptureToggleChanged(object sender, RoutedEventArgs e)
@@ -388,6 +450,24 @@ public partial class MainWindow : Window
         SetStatus("Settings saved");
     }
 
+    private async void OnLiveFeedClick(object sender, RoutedEventArgs e)
+    {
+        if (_assistantEngine.IsRecommendationBusy())
+        {
+            return;
+        }
+
+        var sent = await _assistantEngine.TriggerRecommendationNowAsync();
+        if (!sent)
+        {
+            SetStatus("No recent transcript context available for immediate feed push");
+            return;
+        }
+
+        SetStatus("Live feed context sent to provider");
+        UpdateLiveFeedButton();
+    }
+
     private void OnContextWindowValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
     {
         if (_suppressContextWindowEvents)
@@ -502,6 +582,27 @@ public partial class MainWindow : Window
     private void UpdateContextWindowLabel()
     {
         ContextSecondsLabel.Text = $"Ctx {_state.ContextWindowSeconds}s";
+        UpdateLiveFeedButton();
+    }
+
+    private void UpdateLiveFeedButton()
+    {
+        if (_assistantEngine.IsRecommendationBusy())
+        {
+            LiveFeedButton.Content = "Live Feed sending…";
+            LiveFeedButton.IsEnabled = false;
+            return;
+        }
+
+        LiveFeedButton.IsEnabled = true;
+        if (_state.IsPaused)
+        {
+            LiveFeedButton.Content = "Live Feed paused";
+            return;
+        }
+
+        var remaining = _assistantEngine.GetTimeUntilNextRecommendation();
+        LiveFeedButton.Content = $"Live Feed {remaining:mm\\:ss}";
     }
 
     private async void OnOpenScreenSourceSettings(object sender, RoutedEventArgs e)
@@ -698,6 +799,7 @@ public partial class MainWindow : Window
     protected override void OnClosing(CancelEventArgs e)
     {
         SystemEvents.UserPreferenceChanged -= OnSystemPreferenceChanged;
+        _liveFeedTimer.Stop();
         _threadCts?.Cancel();
         _threadWindow?.Close();
         _state.ChipFeed = _chipFeed.ToList();
