@@ -50,6 +50,7 @@ public partial class MainWindow : Window
 
         SystemEvents.UserPreferenceChanged += OnSystemPreferenceChanged;
         SetStatus("Ready");
+        OnGhostToggleChanged(this, new RoutedEventArgs());
     }
 
     private void BindEngine()
@@ -154,6 +155,8 @@ public partial class MainWindow : Window
         ScreenToggle.IsChecked = _state.ScreenShareEnabled;
         TopmostToggle.IsChecked = _state.PinOnTop;
         Topmost = _state.PinOnTop;
+        GhostToggle.IsChecked = _state.GhostMode;
+        ApplyGhostMode(_state.GhostMode);
         _suppressContextWindowEvents = true;
         ContextWindowSlider.Value = _state.ContextWindowSeconds;
         UpdateContextWindowLabel();
@@ -635,6 +638,20 @@ public partial class MainWindow : Window
         Topmost = _state.PinOnTop;
         await AppStateStore.SaveAsync(_state);
         SetStatus(_state.PinOnTop ? "Pinned on top" : "Pin released");
+    }
+
+    private void ApplyGhostMode(bool enabled)
+    {
+        if (enabled) WindowHelper.HideFromScreenShare(this);
+        else WindowHelper.ShowInScreenShare(this);
+        SetStatus(enabled ? "Hiding from screen shares" : "Visible in screen shares");
+    }
+
+    private async void OnGhostToggleChanged(object sender, RoutedEventArgs e)
+    {
+        _state.GhostMode = GhostToggle.IsChecked == true;
+        ApplyGhostMode(_state.GhostMode);
+        await AppStateStore.SaveAsync(_state);
     }
 
     private void OnSystemPreferenceChanged(object sender, UserPreferenceChangedEventArgs e)

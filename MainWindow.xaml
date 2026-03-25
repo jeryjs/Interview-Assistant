@@ -229,6 +229,7 @@
                         <ToggleButton x:Name="ScreenToggle" Style="{StaticResource ToolbarToggleStyle}" Tag="🖥" Content="Screen" Checked="OnCaptureToggleChanged" Unchecked="OnCaptureToggleChanged" />
                         <Button x:Name="ScreenSourceButton" Style="{StaticResource ToolbarButtonStyle}" Tag="⚙" Content="Source" Click="OnOpenScreenSourceSettings" ToolTip="Screen source settings" />
                         <ToggleButton x:Name="TopmostToggle" Style="{StaticResource ToolbarToggleStyle}" Tag="📌" Content="Pin Top" Checked="OnPinTopToggleChanged" Unchecked="OnPinTopToggleChanged" />
+                        <ToggleButton x:Name="GhostToggle" Style="{StaticResource ToolbarToggleStyle}" Tag="👻" Content="Ghost Mode" Checked="OnGhostToggleChanged" Unchecked="OnGhostToggleChanged" />
                         <Button Style="{StaticResource ToolbarButtonStyle}" Tag="⚙" Content="Settings" Click="OnOpenSettings" />
                         <Button Style="{StaticResource ToolbarButtonStyle}" Tag="🧹" Content="Clear all" Click="OnClearChips" />
                     </WrapPanel>

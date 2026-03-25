@@ -11,6 +11,7 @@ public sealed class AppState
     public long ScreenSourceWindowHandle { get; set; }
     public string ScreenSourceWindowTitle { get; set; } = string.Empty;
     public bool PinOnTop { get; set; }
+    public bool GhostMode { get; set; }
     public bool TranscriptExpanded { get; set; } = false;
     public int ContextWindowSeconds { get; set; } = 30;
     public string WhisperModelPath { get; set; } = string.Empty;
